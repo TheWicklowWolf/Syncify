@@ -207,8 +207,11 @@ class Data_Handler:
 
             for future, file_name in futures:
                 song_actual_link = future.result()
-                song_list_to_download.append({"title": file_name, "link": song_actual_link})
-                logger.warning("Added Song to Download List: " + file_name + " : " + song_actual_link)
+                if song_actual_link:
+                    song_list_to_download.append({"title": file_name, "link": song_actual_link})
+                    logger.warning("Added Song to Download List: " + file_name + " : " + song_actual_link)
+                else:
+                    logger.error("No Link Found for: " + file_name)
 
         return song_list_to_download
 
