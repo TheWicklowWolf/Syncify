@@ -25,7 +25,7 @@ services:
       - /data/media/syncify:/syncify/download
       - /etc/localtime:/etc/localtime:ro
     ports:
-      - 5000:5000![syncify_full_logo](https://github.com/TheWicklowWolf/Syncify/assets/111055425/20291a15-877d-4638-bf58-1a3e5d000f1d)
+      - 5000:5000
 
     environment:
       - thread_limit=4
