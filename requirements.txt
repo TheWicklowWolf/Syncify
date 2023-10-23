@@ -1,0 +1,9 @@
+gunicorn
+gevent
+gevent-websocket
+flask
+flask_socketio
+spotipy
+yt_dlp
+plexapi
+ytmusicapi
