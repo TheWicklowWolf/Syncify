@@ -4,7 +4,7 @@
 <p align="center">
 
 
-![syncify_full_logo](https://github.com/TheWicklowWolf/Syncify/assets/111055425/f7c21dc6-a62f-4806-a7e7-b17441aa9fab)
+![syncify_full_logo](https://github.com/TheWicklowWolf/Syncify/assets/111055425/e9b5e271-a7ef-4e9b-9a47-2436a6f06b44)
 
 
 </p>
@@ -37,7 +37,7 @@ services:
 <p align="center">
 
 
-![image](https://github.com/TheWicklowWolf/Syncify/assets/111055425/ba044b1f-7438-4bbf-adc3-b8e530515c82)
+![image](https://github.com/TheWicklowWolf/Syncify/assets/111055425/025365a6-095f-4110-9c28-4be2921d6f47)
 
 
 </p>
