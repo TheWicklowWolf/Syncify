@@ -3,8 +3,8 @@
 
 <p align="center">
 
-![full_logo](https://github.com/TheWicklowWolf/Syncify/assets/111055425/c07c2794-d537-407e-9f5b-83098244f6c7)
 
+![syncify_full_logo](https://github.com/TheWicklowWolf/Syncify/assets/111055425/f7c21dc6-a62f-4806-a7e7-b17441aa9fab)
 
 
 </p>
@@ -25,7 +25,8 @@ services:
       - /data/media/syncify:/syncify/download
       - /etc/localtime:/etc/localtime:ro
     ports:
-      - 5000:5000
+      - 5000:5000![syncify_full_logo](https://github.com/TheWicklowWolf/Syncify/assets/111055425/20291a15-877d-4638-bf58-1a3e5d000f1d)
+
     environment:
       - thread_limit=4
     restart: unless-stopped
@@ -36,7 +37,7 @@ services:
 <p align="center">
 
 
-
+![image](https://github.com/TheWicklowWolf/Syncify/assets/111055425/ba044b1f-7438-4bbf-adc3-b8e530515c82)
 
 
 </p>
