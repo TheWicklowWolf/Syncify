@@ -155,6 +155,7 @@ class Data_Handler:
         return track_list
 
     def find_youtube_link(self, artist, title):
+        self.ytmusic = YTMusic()
         search_results = self.ytmusic.search(query=artist + " " + title, filter="songs", limit=5)
         first_result = None
         cleaned_title = self.string_cleaner(title).lower()
@@ -200,7 +201,6 @@ class Data_Handler:
                     song_title = song["Title"]
                     future = executor.submit(self.find_youtube_link, song_artist, song_title)
                     futures.append((future, cleaned_full_file_name))
-
                     logger.warning("Searching for Song: " + cleaned_full_file_name)
                 else:
                     logger.warning("File Already in folder: " + cleaned_full_file_name)
@@ -262,7 +262,6 @@ class Data_Handler:
     def master_queue(self):
         try:
             logger.warning("Sync Task started...")
-            self.ytmusic = YTMusic()
             for playlist in self.sync_list:
                 logging.warning("Looking for Playlist Songs on YouTube: " + playlist["Name"])
                 song_list = self.get_download_list(playlist)
