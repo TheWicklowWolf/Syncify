@@ -239,11 +239,7 @@ class Data_Handler:
             "merge_output_format": "mp3",
             "sleep_interval": sleep,
             "add_metadata": True,
-            "postprocessors": [
-                {
-                    "key": "EmbedThumbnail",
-                },
-            ],
+            "embed_thumnail": True,
         }
 
         try:
