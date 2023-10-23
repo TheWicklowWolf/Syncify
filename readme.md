@@ -3,8 +3,8 @@
 
 <p align="center">
 
-![full_logo](https://github.com/TheWicklowWolf/Syncify/assets/111055425/c07c2794-d537-407e-9f5b-83098244f6c7)
 
+![syncify_full_logo](https://github.com/TheWicklowWolf/Syncify/assets/111055425/e9b5e271-a7ef-4e9b-9a47-2436a6f06b44)
 
 
 </p>
@@ -36,7 +36,7 @@ services:
 <p align="center">
 
 
-
+![image](https://github.com/TheWicklowWolf/Syncify/assets/111055425/025365a6-095f-4110-9c28-4be2921d6f47)
 
 
 </p>
