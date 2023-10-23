@@ -193,7 +193,7 @@ class Data_Handler:
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.thread_limit) as executor:
             futures = []
             for song in playlist_tracks:
-                full_file_name = song["Artist"] + " - " + song["Title"]
+                full_file_name = song["Title"] + " - " + song["Artist"]
                 cleaned_full_file_name = self.string_cleaner(full_file_name)
                 if cleaned_full_file_name not in directory_list:
                     song_artist = song["Artist"]
@@ -238,6 +238,12 @@ class Data_Handler:
             "progress_hooks": [self.progress_callback],
             "merge_output_format": "mp3",
             "sleep_interval": sleep,
+            "add_metadata": True,
+            "postprocessors": [
+                {
+                    "key": "EmbedThumbnail",
+                },
+            ],
         }
 
         try:
