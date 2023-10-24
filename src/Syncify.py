@@ -232,17 +232,28 @@ class Data_Handler:
         link = song["link"]
         title = song["title"]
         sleep = playlist["Sleep"] if playlist["Sleep"] else 0
-        full_file_path = os.path.join(self.playlist_folder_path, title + ".mp3")
+        full_file_path = os.path.join(self.playlist_folder_path, title)
         ydl_opts = {
             "ffmpeg_location": "/usr/bin/ffmpeg",
             "format": "251/best",
             "outtmpl": full_file_path,
             "quiet": False,
             "progress_hooks": [self.progress_callback],
-            "merge_output_format": "mp3",
             "sleep_interval": sleep,
-            "add_metadata": True,
-            "embed_thumnail": True,
+            "writethumbnail": True,
+            "postprocessors": [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "0",
+                },
+                {
+                    "key": "EmbedThumbnail",
+                },
+                {
+                    "key": "FFmpegMetadata",
+                },
+            ],
         }
 
         try:
