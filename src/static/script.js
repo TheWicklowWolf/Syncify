@@ -157,6 +157,15 @@ save_sync_list.addEventListener("click", () => {
 
 const themeSwitch = document.getElementById('themeSwitch');
 const savedTheme = localStorage.getItem('theme');
+const savedSwitchPosition = localStorage.getItem('switchPosition');
+
+if (savedSwitchPosition) {
+    themeSwitch.checked = savedSwitchPosition === 'true';
+}
+
+if (savedTheme) {
+    document.documentElement.setAttribute('data-bs-theme', savedTheme);
+}
 
 themeSwitch.addEventListener('click', () => {
     if (document.documentElement.getAttribute('data-bs-theme') === 'dark') {
@@ -164,8 +173,6 @@ themeSwitch.addEventListener('click', () => {
     } else {
         document.documentElement.setAttribute('data-bs-theme', 'dark');
     }
+    localStorage.setItem('theme', document.documentElement.getAttribute('data-bs-theme'));
+    localStorage.setItem('switchPosition', themeSwitch.checked);
 });
-
-if (savedTheme) {
-    document.documentElement.setAttribute('data-bs-theme', savedTheme);
-}
