@@ -154,3 +154,18 @@ save_sync_list.addEventListener("click", () => {
         save_message.style.display = "none";
     }, 3000);
 });
+
+const themeSwitch = document.getElementById('themeSwitch');
+const savedTheme = localStorage.getItem('theme');
+
+themeSwitch.addEventListener('click', () => {
+    if (document.documentElement.getAttribute('data-bs-theme') === 'dark') {
+        document.documentElement.setAttribute('data-bs-theme', 'light');
+    } else {
+        document.documentElement.setAttribute('data-bs-theme', 'dark');
+    }
+});
+
+if (savedTheme) {
+    document.documentElement.setAttribute('data-bs-theme', savedTheme);
+}

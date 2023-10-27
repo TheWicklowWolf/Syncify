@@ -22,9 +22,9 @@ class Data_Handler:
         self.download_folder = "download"
         self.plex_address = "http://192.168.1.2:32400"
         self.plex_token = ""
-        self.plex_library_name = "YouTube"
-        self.spotify_client_id = "abc"
-        self.spotify_client_secret = "123"
+        self.plex_library_name = "Music"
+        self.spotify_client_id = ""
+        self.spotify_client_secret = ""
         self.thread_limit = thread_limit
         self.plex_scan_req_flag = False
 
