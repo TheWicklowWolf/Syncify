@@ -14,19 +14,20 @@ from plexapi.server import PlexServer
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 import concurrent.futures
+import requests
 
 
 class Data_Handler:
     def __init__(self, thread_limit):
         self.config_folder = "config"
-        self.download_folder = "download"
-        self.plex_address = "http://192.168.1.2:32400"
-        self.plex_token = ""
-        self.plex_library_name = "Music"
+        self.download_folder = "downloads"
+        self.media_server_addresses = "Plex: http://192.168.1.2:32400, Jellyfin: http://192.168.1.2:8096"
+        self.media_server_tokens = "Plex: abc, Jellyfin: xyz"
+        self.media_server_library_name = "Music"
         self.spotify_client_id = ""
         self.spotify_client_secret = ""
         self.thread_limit = thread_limit
-        self.plex_scan_req_flag = False
+        self.media_server_scan_req_flag = False
 
         if not os.path.exists(self.config_folder):
             os.makedirs(self.config_folder)
@@ -54,9 +55,9 @@ class Data_Handler:
             with open(self.settings_config_file, "r") as json_file:
                 ret = json.load(json_file)
             self.sync_start_times = ret["sync_start_times"]
-            self.plex_address = ret["plex_address"]
-            self.plex_token = ret["plex_token"]
-            self.plex_library_name = ret["plex_library_name"]
+            self.media_server_addresses = ret["media_server_addresses"]
+            self.media_server_tokens = ret["media_server_tokens"]
+            self.media_server_library_name = ret["media_server_library_name"]
             self.spotify_client_id = ret["spotify_client_id"]
             self.spotify_client_secret = ret["spotify_client_secret"]
 
@@ -69,9 +70,9 @@ class Data_Handler:
                 json.dump(
                     {
                         "sync_start_times": self.sync_start_times,
-                        "plex_address": self.plex_address,
-                        "plex_token": self.plex_token,
-                        "plex_library_name": self.plex_library_name,
+                        "media_server_addresses": self.media_server_addresses,
+                        "media_server_tokens": self.media_server_tokens,
+                        "media_server_library_name": self.media_server_library_name,
                         "spotify_client_id": self.spotify_client_id,
                         "spotify_client_secret": self.spotify_client_secret,
                     },
@@ -182,7 +183,7 @@ class Data_Handler:
         playlist_link = playlist["Link"]
         playlist_tracks = self.spotify_extractor(playlist_link)
 
-        playlist_folder = playlist["Name"]
+        playlist_folder = playlist_name
         self.playlist_folder_path = os.path.join(self.download_folder, playlist_folder)
 
         if not os.path.exists(self.playlist_folder_path):
@@ -230,8 +231,8 @@ class Data_Handler:
             logger.error(str(e))
 
     def download_song(self, song, playlist):
-        if self.plex_scan_req_flag == False:
-            self.plex_scan_req_flag = True
+        if self.media_server_scan_req_flag == False:
+            self.media_server_scan_req_flag = True
         link = song["link"]
         title = song["title"]
         sleep = playlist["Sleep"] if playlist["Sleep"] else 0
@@ -278,7 +279,7 @@ class Data_Handler:
 
     def master_queue(self):
         try:
-            self.plex_scan_req_flag = False
+            self.media_server_scan_req_flag = False
             logger.warning("Sync Task started...")
             for playlist in self.sync_list:
                 logging.warning("Looking for Playlist Songs on YouTube: " + playlist["Name"])
@@ -298,24 +299,48 @@ class Data_Handler:
             data = {"sync_list": self.sync_list}
             socketio.emit("Update", data)
 
-            if self.plex_scan_req_flag == True and self.plex_token:
-                logger.warning("Attempting Plex Sync")
-                plex_server = PlexServer(self.plex_address, self.plex_token)
-                library_section = plex_server.library.section(self.plex_library_name)
-                library_section.update()
-                logger.warning(f"Library scan for '{self.plex_library_name}' started.")
+            if self.media_server_scan_req_flag == True and self.media_server_tokens:
+                self.sync_media_servers()
             else:
-                logger.warning("Plex Sync not required")
+                logger.warning("Media Server Sync not required")
 
         except Exception as e:
             logger.error(str(e))
             logger.warning("Sync Finished")
 
         else:
-            logger.warning("Successfully Completed")
+            logger.warning("Completed")
 
     def add_playlist(self, playlist):
         self.sync_list.extend(playlist)
+
+    def sync_media_servers(self):
+        media_servers = self.convert_string_to_dict(self.media_server_addresses)
+        media_tokens = self.convert_string_to_dict(self.media_server_tokens)
+        if "Plex" in media_servers and "Plex" in media_tokens:
+            try:
+                token = media_tokens.get("Plex")
+                address = media_servers.get("Plex")
+                logger.warning("Attempting Plex Sync")
+                media_server_server = PlexServer(address, token)
+                library_section = media_server_server.library.section(self.media_server_library_name)
+                library_section.update()
+                logger.warning(f"Plex Library scan for '{self.media_server_library_name}' started.")
+            except Exception as e:
+                logger.warning(f"Plex Library scan failed: " + str(e))
+        if "Jellyfin" in media_tokens and "Jellyfin" in media_tokens:
+            try:
+                token = media_tokens.get("Jellyfin")
+                address = media_servers.get("Jellyfin")
+                logger.warning("Attempting Jellyfin Sync")
+                url = f"{address}/Library/Refresh?api_key={token}"
+                response = requests.post(url)
+                if response.status_code == 204:
+                    logger.warning("Jellyfin Library refresh request successful.")
+                else:
+                    logger.warning(f"Jellyfin Error: {response.status_code}, {response.text}")
+            except Exception as e:
+                logger.warning(f"Jellyfin Library scan failed: " + str(e))
 
     def string_cleaner(self, input_string):
         if isinstance(input_string, str):
@@ -333,6 +358,20 @@ class Data_Handler:
                 cleaned_string = temp_string.strip()
                 cleaned_strings.append(cleaned_string)
             return cleaned_strings
+
+    def convert_string_to_dict(self, raw_string):
+        result = {}
+        if not raw_string:
+            return result
+
+        pairs = raw_string.split(",")
+        for pair in pairs:
+            key_value = pair.split(":", 1)
+            if len(key_value) == 2:
+                key, value = key_value
+                result[key.strip()] = value.strip()
+
+        return result
 
 
 app = Flask(__name__)
@@ -367,9 +406,9 @@ def connection():
 def loadSettings():
     data = {
         "sync_start_times": data_handler.sync_start_times,
-        "plex_address": data_handler.plex_address,
-        "plex_token": data_handler.plex_token,
-        "plex_library_name": data_handler.plex_library_name,
+        "media_server_addresses": data_handler.media_server_addresses,
+        "media_server_tokens": data_handler.media_server_tokens,
+        "media_server_library_name": data_handler.media_server_library_name,
         "spotify_client_id": data_handler.spotify_client_id,
         "spotify_client_secret": data_handler.spotify_client_secret,
     }
@@ -391,9 +430,9 @@ def save_playlist_settings(data):
 
 @socketio.on("updateSettings")
 def updateSettings(data):
-    data_handler.plex_address = data["plex_address"]
-    data_handler.plex_token = data["plex_token"]
-    data_handler.plex_library_name = data["plex_library_name"]
+    data_handler.media_server_addresses = data["media_server_addresses"]
+    data_handler.media_server_tokens = data["media_server_tokens"]
+    data_handler.media_server_library_name = data["media_server_library_name"]
     data_handler.spotify_client_id = data["spotify_client_id"]
     data_handler.spotify_client_secret = data["spotify_client_secret"]
     try:

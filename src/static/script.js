@@ -5,9 +5,9 @@ var save_changes_button = document.getElementById("save-changes-button");
 var save_sync_list = document.getElementById("save-sync-list");
 var save_sync_list_msg = document.getElementById("save-sync-list-msg");
 var sync_start_times = document.getElementById("sync_start_times");
-var plex_address = document.getElementById("plex_address");
-var plex_token = document.getElementById("plex_token");
-var plex_library_name = document.getElementById("plex_library_name");
+var media_server_addresses = document.getElementById("media_server_addresses");
+var media_server_tokens = document.getElementById("media_server_tokens");
+var media_server_library_name = document.getElementById("media_server_library_name");
 var spotify_client_id = document.getElementById("spotify_client_id");
 var spotify_client_secret = document.getElementById("spotify_client_secret");
 var playlists = [];
@@ -120,9 +120,9 @@ config_modal.addEventListener('show.bs.modal', function (event) {
     socket.emit("loadSettings");
     function handleSettingsLoaded(settings) {
         sync_start_times.value = settings.sync_start_times.join(', ');
-        plex_address.value = settings.plex_address;
-        plex_token.value = settings.plex_token;
-        plex_library_name.value = settings.plex_library_name;
+        media_server_addresses.value = settings.media_server_addresses;
+        media_server_tokens.value = settings.media_server_tokens;
+        media_server_library_name.value = settings.media_server_library_name;
         spotify_client_id.value = settings.spotify_client_id;
         spotify_client_secret.value = settings.spotify_client_secret;
         socket.off("settingsLoaded", handleSettingsLoaded);
@@ -133,9 +133,9 @@ config_modal.addEventListener('show.bs.modal', function (event) {
 save_changes_button.addEventListener("click", () => {
     socket.emit("updateSettings", {
         "sync_start_times": sync_start_times.value,
-        "plex_address": plex_address.value,
-        "plex_token": plex_token.value,
-        "plex_library_name": plex_library_name.value,
+        "media_server_addresses": media_server_addresses.value,
+        "media_server_tokens": media_server_tokens.value,
+        "media_server_library_name": media_server_library_name.value,
         "spotify_client_id": spotify_client_id.value,
         "spotify_client_secret": spotify_client_secret.value,
     });
