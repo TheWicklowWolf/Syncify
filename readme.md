@@ -22,7 +22,7 @@ services:
     container_name: syncify
     volumes:
       - /config/syncify:/syncify/config
-      - /data/media/syncify:/syncify/download
+      - /data/media/syncify:/syncify/downloads
       - /etc/localtime:/etc/localtime:ro
     ports:
       - 5000:5000
