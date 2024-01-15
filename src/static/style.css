@@ -13,13 +13,6 @@ body {
     overflow-y: auto;
 }
 
-.table{
-    text-align: center; 
-}
-th, td {
-  vertical-align: middle; 
-}
-
 .custom-button-width{
     width: 60px !important;
 }
