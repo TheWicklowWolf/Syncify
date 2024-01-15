@@ -105,12 +105,12 @@ class Data_Handler:
             within_sync_window = any(datetime.time(t, 0, 0) <= current_time <= datetime.time(t, 59, 59) for t in self.sync_start_times)
 
             if within_sync_window:
-                logger.warning("Time to Start Sync")
+                logger.warning("Time to Start Sync - as in a time window " + str(self.sync_start_times))
                 self.master_queue()
                 logger.warning("Big sleep for 1 Hour - Sync Done")
                 time.sleep(3600)
+                logger.warning("Checking every 60 seconds as not in sync time window " + str(self.sync_start_times))
             else:
-                logger.warning("Small sleep as not in sync time window " + str(self.sync_start_times) + " - checking again in 60 seconds")
                 time.sleep(60)
 
     def spotify_extractor(self, link):
@@ -306,10 +306,10 @@ class Data_Handler:
 
         except Exception as e:
             logger.error(str(e))
-            logger.warning("Sync Finished")
+            logger.warning("Finished: Incomplete")
 
         else:
-            logger.warning("Completed")
+            logger.warning("Finished: Complete")
 
     def add_playlist(self, playlist):
         self.sync_list.extend(playlist)
