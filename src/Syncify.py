@@ -15,6 +15,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 import concurrent.futures
 import requests
+from thefuzz import fuzz
 
 
 class Data_Handler:
@@ -160,6 +161,7 @@ class Data_Handler:
         self.ytmusic = YTMusic()
         search_results = self.ytmusic.search(query=artist + " " + title, filter="songs", limit=5)
         first_result = None
+        cleaned_artist = self.string_cleaner(artist).lower()
         cleaned_title = self.string_cleaner(title).lower()
         for item in search_results:
             cleaned_youtube_title = self.string_cleaner(item["title"]).lower()
@@ -167,15 +169,31 @@ class Data_Handler:
                 first_result = "https://www.youtube.com/watch?v=" + item["videoId"]
                 break
         else:
-            # Try again but reverse the check otherwise select top result
-            if len(search_results):
-                for item in search_results:
-                    cleaned_youtube_title = self.string_cleaner(item["title"]).lower()
-                    if all(word in cleaned_title for word in cleaned_youtube_title.split()):
-                        first_result = "https://www.youtube.com/watch?v=" + item["videoId"]
-                        break
-                else:
-                    first_result = "https://www.youtube.com/watch?v=" + search_results[0]["videoId"]
+            # Try again but check for a partial match
+            for item in search_results:
+                cleaned_youtube_title = self.string_cleaner(item["title"]).lower()
+                cleaned_youtube_artists = ", ".join(self.string_cleaner(x["name"]).lower() for x in item["artists"])
+
+                title_ratio = 100 if all(word in cleaned_title for word in cleaned_youtube_title.split()) else fuzz.ratio(cleaned_title, cleaned_youtube_title)
+                artist_ratio = 100 if cleaned_artist in cleaned_youtube_artists else fuzz.ratio(cleaned_artist, cleaned_youtube_artists)
+
+                if title_ratio >= 90 and artist_ratio >= 90:
+                    first_result = "https://www.youtube.com/watch?v=" + item["videoId"]
+                    break
+            else:
+                # Default to first result if Top result is not found
+                first_result = "https://www.youtube.com/watch?v=" + search_results[0]["videoId"]
+
+                # Search for Top result specifically
+                top_search_results = self.ytmusic.search(query=cleaned_title, limit=5)
+                cleaned_youtube_title = self.string_cleaner(top_search_results[0]["title"]).lower()
+                if "Top result" in top_search_results[0]["category"] and top_search_results[0]["resultType"] == "song" or top_search_results[0]["resultType"] == "video":
+                    cleaned_youtube_artists = ", ".join(self.string_cleaner(x["name"]).lower() for x in top_search_results[0]["artists"])
+                    title_ratio = 100 if cleaned_title in cleaned_youtube_title else fuzz.ratio(cleaned_title, cleaned_youtube_title)
+                    artist_ratio = 100 if cleaned_artist in cleaned_youtube_artists else fuzz.ratio(cleaned_artist, cleaned_youtube_artists)
+                    if (title_ratio >= 90 and artist_ratio >= 40) or (title_ratio >= 40 and artist_ratio >= 90):
+                        first_result = "https://www.youtube.com/watch?v=" + top_search_results[0]["videoId"]
+
         return first_result
 
     def get_download_list(self, playlist):

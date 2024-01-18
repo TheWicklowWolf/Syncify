@@ -7,3 +7,5 @@ spotipy
 yt_dlp
 plexapi
 ytmusicapi
+requests
+thefuzz
