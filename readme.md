@@ -2,10 +2,8 @@
 ![Docker Pulls](https://img.shields.io/docker/pulls/thewicklowwolf/syncify.svg)
 
 <p align="center">
-
-
-![syncify_full_logo](https://github.com/TheWicklowWolf/Syncify/assets/111055425/e9b5e271-a7ef-4e9b-9a47-2436a6f06b44)
-
+  
+<img src="https://raw.githubusercontent.com/TheWicklowWolf/Syncify/main/src/static/syncify_full_logo.png" alt="logo">
 
 </p>
 
