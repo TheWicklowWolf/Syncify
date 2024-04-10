@@ -19,7 +19,9 @@ from thefuzz import fuzz
 
 
 class DataHandler:
-    def __init__(self, thread_limit):
+    def __init__(self):
+        logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(message)s", datefmt="%d/%m/%Y %H:%M:%S", handlers=[logging.StreamHandler(sys.stdout)])
+        self.logger = logging.getLogger()
         self.config_folder = "config"
         self.download_folder = "downloads"
         self.media_server_addresses = "Plex: http://192.168.1.2:32400, Jellyfin: http://192.168.1.2:8096"
@@ -27,7 +29,7 @@ class DataHandler:
         self.media_server_library_name = "Music"
         self.spotify_client_id = ""
         self.spotify_client_secret = ""
-        self.thread_limit = thread_limit
+        self.thread_limit = int(os.environ.get("thread_limit", 1))
         self.media_server_scan_req_flag = False
 
         if not os.path.exists(self.config_folder):
@@ -66,7 +68,7 @@ class DataHandler:
             self.spotify_client_secret = ret["spotify_client_secret"]
 
         except Exception as e:
-            logger.error("Error Loading Config: " + str(e))
+            self.logger.error("Error Loading Config: " + str(e))
 
     def save_to_file(self):
         try:
@@ -85,7 +87,7 @@ class DataHandler:
                 )
 
         except Exception as e:
-            logger.error("Error Saving Config: " + str(e))
+            self.logger.error("Error Saving Config: " + str(e))
 
     def load_sync_list_from_file(self):
         try:
@@ -93,7 +95,7 @@ class DataHandler:
                 self.sync_list = json.load(json_file)
 
         except Exception as e:
-            logger.error("Error Loading Playlists: " + str(e))
+            self.logger.error("Error Loading Playlists: " + str(e))
 
     def save_sync_list_to_file(self):
         try:
@@ -101,7 +103,7 @@ class DataHandler:
                 json.dump(self.sync_list, json_file, indent=4)
 
         except Exception as e:
-            logger.error("Error Saving Playlists: " + str(e))
+            self.logger.error("Error Saving Playlists: " + str(e))
 
     def schedule_checker(self):
         while True:
@@ -109,11 +111,11 @@ class DataHandler:
             within_sync_window = any(datetime.time(t, 0, 0) <= current_time <= datetime.time(t, 59, 59) for t in self.sync_start_times)
 
             if within_sync_window:
-                logger.warning("Time to Start Sync - as in a time window " + str(self.sync_start_times))
+                self.logger.warning("Time to Start Sync - as in a time window " + str(self.sync_start_times))
                 self.master_queue()
-                logger.warning("Big sleep for 1 Hour - Sync Done")
+                self.logger.warning("Big sleep for 1 Hour - Sync Done")
                 time.sleep(3600)
-                logger.warning("Checking every 60 seconds as not in sync time window " + str(self.sync_start_times))
+                self.logger.warning("Checking every 60 seconds as not in sync time window " + str(self.sync_start_times))
             else:
                 time.sleep(60)
 
@@ -224,17 +226,17 @@ class DataHandler:
                     song_title = song["Title"]
                     future = executor.submit(self.find_youtube_link, song_artist, song_title)
                     futures.append((future, cleaned_full_file_name))
-                    logger.warning("Searching for Song: " + cleaned_full_file_name)
+                    self.logger.warning("Searching for Song: " + cleaned_full_file_name)
                 else:
-                    logger.warning("File Already in folder: " + cleaned_full_file_name)
+                    self.logger.warning("File Already in folder: " + cleaned_full_file_name)
 
             for future, file_name in futures:
                 song_actual_link = future.result()
                 if song_actual_link:
                     song_list_to_download.append({"title": file_name, "link": song_actual_link})
-                    logger.warning("Added Song to Download List: " + file_name + " : " + song_actual_link)
+                    self.logger.warning("Added Song to Download List: " + file_name + " : " + song_actual_link)
                 else:
-                    logger.error("No Link Found for: " + file_name)
+                    self.logger.error("No Link Found for: " + file_name)
 
         return song_list_to_download
 
@@ -249,7 +251,7 @@ class DataHandler:
                 concurrent.futures.wait(futures)
 
         except Exception as e:
-            logger.error(str(e))
+            self.logger.error(str(e))
 
     def download_song(self, song, playlist):
         if self.media_server_scan_req_flag == False:
@@ -285,25 +287,25 @@ class DataHandler:
 
         try:
             yt_downloader = yt_dlp.YoutubeDL(ydl_opts)
-            logger.warning("yt_dl Start : " + link)
+            self.logger.warning("yt_dl Start : " + link)
 
             yt_downloader.download([link])
-            logger.warning("yt_dl Complete : " + link)
+            self.logger.warning("yt_dl Complete : " + link)
 
         except Exception as e:
-            logger.error(f"Error downloading song: {link}. Error message: {e}")
+            self.logger.error(f"Error downloading song: {link}. Error message: {e}")
 
     def progress_callback(self, d):
         if d["status"] == "finished":
-            logger.warning("Download complete")
+            self.logger.warning("Download complete")
 
         elif d["status"] == "downloading":
-            logger.warning(f'Downloaded {d["_percent_str"]} of {d["_total_bytes_str"]} at {d["_speed_str"]}')
+            self.logger.warning(f'Downloaded {d["_percent_str"]} of {d["_total_bytes_str"]} at {d["_speed_str"]}')
 
     def master_queue(self):
         try:
             self.media_server_scan_req_flag = False
-            logger.warning("Sync Task started...")
+            self.logger.warning("Sync Task started...")
             for playlist in self.sync_list:
                 logging.warning("Looking for Playlist Songs on YouTube: " + playlist["Name"])
                 song_list = self.get_download_list(playlist)
@@ -325,14 +327,14 @@ class DataHandler:
             if self.media_server_scan_req_flag == True and self.media_server_tokens:
                 self.sync_media_servers()
             else:
-                logger.warning("Media Server Sync not required")
+                self.logger.warning("Media Server Sync not required")
 
         except Exception as e:
-            logger.error(str(e))
-            logger.warning("Finished: Incomplete")
+            self.logger.error(str(e))
+            self.logger.warning("Finished: Incomplete")
 
         else:
-            logger.warning("Finished: Complete")
+            self.logger.warning("Finished: Complete")
 
     def add_playlist(self, playlist):
         self.sync_list.extend(playlist)
@@ -344,26 +346,26 @@ class DataHandler:
             try:
                 token = media_tokens.get("Plex")
                 address = media_servers.get("Plex")
-                logger.warning("Attempting Plex Sync")
+                self.logger.warning("Attempting Plex Sync")
                 media_server_server = PlexServer(address, token)
                 library_section = media_server_server.library.section(self.media_server_library_name)
                 library_section.update()
-                logger.warning(f"Plex Library scan for '{self.media_server_library_name}' started.")
+                self.logger.warning(f"Plex Library scan for '{self.media_server_library_name}' started.")
             except Exception as e:
-                logger.warning(f"Plex Library scan failed: " + str(e))
+                self.logger.warning(f"Plex Library scan failed: " + str(e))
         if "Jellyfin" in media_tokens and "Jellyfin" in media_tokens:
             try:
                 token = media_tokens.get("Jellyfin")
                 address = media_servers.get("Jellyfin")
-                logger.warning("Attempting Jellyfin Sync")
+                self.logger.warning("Attempting Jellyfin Sync")
                 url = f"{address}/Library/Refresh?api_key={token}"
                 response = requests.post(url)
                 if response.status_code == 204:
-                    logger.warning("Jellyfin Library refresh request successful.")
+                    self.logger.warning("Jellyfin Library refresh request successful.")
                 else:
-                    logger.warning(f"Jellyfin Error: {response.status_code}, {response.text}")
+                    self.logger.warning(f"Jellyfin Error: {response.status_code}, {response.text}")
             except Exception as e:
-                logger.warning(f"Jellyfin Library scan failed: " + str(e))
+                self.logger.warning(f"Jellyfin Library scan failed: " + str(e))
 
     def string_cleaner(self, input_string):
         if isinstance(input_string, str):
@@ -401,17 +403,7 @@ app = Flask(__name__)
 app.secret_key = "secret_key"
 socketio = SocketIO(app)
 
-logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(message)s", datefmt="%d/%m/%Y %H:%M:%S", handlers=[logging.StreamHandler(sys.stdout)])
-logger = logging.getLogger()
-
-try:
-    thread_limit = int(os.environ["thread_limit"])
-
-except:
-    thread_limit = 1
-
-logger.warning("thread_limit: " + str(thread_limit))
-data_handler = DataHandler(thread_limit)
+data_handler = DataHandler()
 
 
 @app.route("/")
@@ -467,10 +459,10 @@ def updateSettings(data):
         data_handler.sync_start_times = cleaned_sync_start_times
 
     except Exception as e:
-        logger.error(str(e))
+        data_handler.logger.error(str(e))
         data_handler.sync_start_times = [0]
     finally:
-        logger.warning("Sync Times: " + str(data_handler.sync_start_times))
+        data_handler.logger.warning("Sync Times: " + str(data_handler.sync_start_times))
     data_handler.save_to_file()
 
 
