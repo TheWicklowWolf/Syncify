@@ -16,13 +16,13 @@ services:
     image: thewicklowwolf/syncify:latest
     container_name: syncify
     volumes:
-      - /config/syncify:/syncify/config
+      - /path/to/config:/syncify/config
       - /data/media/syncify:/syncify/downloads
       - /etc/localtime:/etc/localtime:ro
     ports:
       - 5000:5000
     environment:
-      - thread_limit=4
+      - thread_limit=1
     restart: unless-stopped
 ```
 
