@@ -18,7 +18,7 @@ import requests
 from thefuzz import fuzz
 
 
-class Data_Handler:
+class DataHandler:
     def __init__(self, thread_limit):
         self.config_folder = "config"
         self.download_folder = "downloads"
@@ -46,6 +46,9 @@ class Data_Handler:
 
         if os.path.exists(self.sync_list_config_file):
             self.load_sync_list_from_file()
+
+        full_cookies_path = os.path.join(self.config_folder, "cookies.txt")
+        self.cookies_path = full_cookies_path if os.path.exists(full_cookies_path) else None
 
         task_thread = threading.Thread(target=self.schedule_checker)
         task_thread.daemon = True
@@ -277,6 +280,8 @@ class Data_Handler:
                 },
             ],
         }
+        if self.cookies_path:
+            ydl_opts["cookiefile"] = self.cookies_path
 
         try:
             yt_downloader = yt_dlp.YoutubeDL(ydl_opts)
@@ -406,7 +411,7 @@ except:
     thread_limit = 1
 
 logger.warning("thread_limit: " + str(thread_limit))
-data_handler = Data_Handler(thread_limit)
+data_handler = DataHandler(thread_limit)
 
 
 @app.route("/")
