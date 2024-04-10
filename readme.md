@@ -1,11 +1,9 @@
 ![Build Status](https://github.com/TheWicklowWolf/Syncify/actions/workflows/main.yml/badge.svg)
 ![Docker Pulls](https://img.shields.io/docker/pulls/thewicklowwolf/syncify.svg)
 
-<p align="center">
-  
+
 <img src="https://raw.githubusercontent.com/TheWicklowWolf/Syncify/main/src/static/syncify_full_logo.png" alt="logo">
 
-</p>
 
 Web GUI for synchronising and fetching content from a Spotify playlist.
 
@@ -27,6 +25,15 @@ services:
       - thread_limit=4
     restart: unless-stopped
 ```
+
+
+## Cookies (optional)
+To utilize a cookies file with yt-dlp, follow these steps:
+
+* Generate Cookies File: Open your web browser and use a suitable extension (e.g. cookies.txt for Firefox) to extract cookies for a user on YT.
+
+* Save Cookies File: Save the obtained cookies into a file named `cookies.txt` and put it into the config folder.
+
 
 ---
 
