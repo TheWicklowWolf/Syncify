@@ -13,7 +13,6 @@ Web GUI for synchronising and fetching content from a Spotify playlist.
 ## Run using docker-compose
 
 ```yaml
-version: "2.1"
 services:
   syncify:
     image: thewicklowwolf/syncify:latest
