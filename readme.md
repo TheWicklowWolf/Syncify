@@ -5,7 +5,7 @@
 <img src="https://raw.githubusercontent.com/TheWicklowWolf/Syncify/main/src/static/syncify_full_logo.png" alt="logo">
 
 
-Web GUI for synchronising and fetching content from a Spotify playlist.
+Syncify is a tool for synchronising and fetching content from a Spotify playlist via yt-dlp.
 
 
 ## Run using docker-compose
