@@ -37,15 +37,11 @@ To utilize a cookies file with yt-dlp, follow these steps:
 
 ---
 
-
 ![image](https://github.com/TheWicklowWolf/Syncify/assets/111055425/025365a6-095f-4110-9c28-4be2921d6f47)
-
 
 ---
 
-
 ![SyncifyDark](https://github.com/TheWicklowWolf/Syncify/assets/111055425/0ef9bb70-77c4-4da5-95b5-889839b63b84)
-
 
 ---
 
