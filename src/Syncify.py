@@ -162,6 +162,27 @@ class DataHandler:
 
         return track_list
 
+    def youtube_extractor(self, link):
+        self.ytmusic = YTMusic()
+        track_list = []
+
+        playlist_prefix = "https://music.youtube.com/playlist?list="
+        if playlist_prefix in link:
+            start_pos = link.find('list=') + len('list=')
+            playlist_id = link[start_pos:]
+            playlist = self.ytmusic.get_playlist(playlist_id)
+            playlist_name = playlist['title']
+
+            for track in playlist['tracks']:
+                track_title = track['title']
+                artist_str = ", ".join([a['name'] for a in track['artists']])
+                track_list.append({"Artist": artist_str, "Title": track_title, "Status": "Queued", "Folder": playlist_name, "VideoID": track['videoId']})
+        else:
+            self.logger.error("Unsupported url")
+
+        return track_list
+
+
     def find_youtube_link(self, artist, title):
         self.ytmusic = YTMusic()
         search_results = self.ytmusic.search(query=artist + " " + title, filter="songs", limit=5)
@@ -204,7 +225,10 @@ class DataHandler:
     def get_download_list(self, playlist):
         playlist_name = playlist["Name"]
         playlist_link = playlist["Link"]
-        playlist_tracks = self.spotify_extractor(playlist_link)
+        if "youtube" in playlist_link:
+            playlist_tracks = self.youtube_extractor(playlist_link)
+        else:
+            playlist_tracks = self.spotify_extractor(playlist_link)
 
         playlist_folder = playlist_name
         self.playlist_folder_path = os.path.join(self.download_folder, playlist_folder)
@@ -224,9 +248,14 @@ class DataHandler:
                 if cleaned_full_file_name not in directory_list:
                     song_artist = song["Artist"]
                     song_title = song["Title"]
-                    future = executor.submit(self.find_youtube_link, song_artist, song_title)
-                    futures.append((future, cleaned_full_file_name))
-                    self.logger.warning("Searching for Song: " + cleaned_full_file_name)
+                    if song.get('VideoID'):
+                        song_list_to_download.append({"title": cleaned_full_file_name,
+                                                      "link": "https://www.youtube.com/watch?v=" + song['VideoID']})
+                        self.logger.warning("Added Song to Download List: " + cleaned_full_file_name + " : " + song['VideoID'])
+                    else:
+                        future = executor.submit(self.find_youtube_link, song_artist, song_title)
+                        futures.append((future, cleaned_full_file_name))
+                        self.logger.warning("Searching for Song: " + cleaned_full_file_name)
                 else:
                     self.logger.warning("File Already in folder: " + cleaned_full_file_name)
 
@@ -262,7 +291,8 @@ class DataHandler:
         full_file_path = os.path.join(self.playlist_folder_path, title)
         ydl_opts = {
             "ffmpeg_location": "/usr/bin/ffmpeg",
-            "format": "251/best",
+            "format": "bestaudio[ext=m4a]",
+            "final_ext": "mp3",
             "outtmpl": full_file_path,
             "quiet": False,
             "progress_hooks": [self.progress_callback],
@@ -280,6 +310,12 @@ class DataHandler:
                     "key": "FFmpegMetadata",
                 },
             ],
+            "postprocessor_args": {
+                'thumbnailsconvertor+ffmpeg_o': ['-c:v',
+                                                 'mjpeg',
+                                                 '-vf',
+                                                 "crop='if(gt(ih,iw),iw,ih)':'if(gt(iw,ih),ih,iw)'"]
+            }
         }
         if self.cookies_path:
             ydl_opts["cookiefile"] = self.cookies_path
@@ -434,9 +470,9 @@ def loadSettings():
 @socketio.on("save_playlist_settings")
 def save_playlist_settings(data):
     playlist_to_be_saved = data["playlist"]
-    playlist_name = playlist_to_be_saved["Name"]
+    playlist_id = playlist_to_be_saved["ID"]
     for playlist in data_handler.sync_list:
-        if playlist["Name"] == playlist_name:
+        if playlist["ID"] == playlist_id:
             playlist.update(playlist_to_be_saved)
             break
     else:

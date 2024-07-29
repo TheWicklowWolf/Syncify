@@ -111,7 +111,7 @@ function savePlaylistSettings(index) {
 socket.on("Update", updated_info);
 
 document.getElementById("add-playlist").addEventListener("click", function () {
-    playlists.push({ Name: "New Playlist", Link: "", Sleep: 0, Last_Synced: "Never", Song_Count: 0 });
+    playlists.push({ ID: self.crypto.randomUUID() ,Name: "New Playlist", Link: "", Sleep: 0, Last_Synced: "Never", Song_Count: 0 });
     renderPlaylists();
     createEditModalsAndListeners();
 });
