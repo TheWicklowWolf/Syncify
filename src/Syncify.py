@@ -34,6 +34,7 @@ class DataHandler:
         self.spotify_client_secret = ""
         self.thread_limit = int(os.environ.get("thread_limit", 1))
         self.media_server_scan_req_flag = False
+        self.crop_album_art = os.getenv('crop_album_art', 'false').lower()
 
         if not os.path.exists(self.config_folder):
             os.makedirs(self.config_folder)
@@ -308,14 +309,17 @@ class DataHandler:
                 {
                     "key": "FFmpegMetadata",
                 },
-            ],
-            "postprocessor_args": {
+            ]
+        }
+
+        if self.crop_album_art == 'true':
+            ydl_opts["postprocessor_args"] = {
                 'thumbnailsconvertor+ffmpeg_o': ['-c:v',
                                                  'mjpeg',
                                                  '-vf',
                                                  "crop='if(gt(ih,iw),iw,ih)':'if(gt(iw,ih),ih,iw)'"]
             }
-        }
+
         if self.cookies_path:
             ydl_opts["cookiefile"] = self.cookies_path
 

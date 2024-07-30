@@ -16,4 +16,5 @@ RUN chmod -R 777 /syncify/downloads
 RUN pip install --no-cache-dir -r requirements.txt
 EXPOSE 5000
 USER general_user
+ENV crop_album_art=false
 CMD ["gunicorn","src.Syncify:app", "-c", "gunicorn_config.py"]

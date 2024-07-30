@@ -23,6 +23,8 @@ services:
       - 5000:5000
     environment:
       - thread_limit=1
+      # Set this to `true` if you want to force create square album art instead of using 16:9 aspect from YT
+      - crop_album_art=false # optional (default=false)
     restart: unless-stopped
 ```
 
