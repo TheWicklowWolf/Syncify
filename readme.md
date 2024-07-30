@@ -34,6 +34,7 @@ To utilize a cookies file with yt-dlp, follow these steps:
 
 * Save Cookies File: Save the obtained cookies into a file named `cookies.txt` and put it into the config folder.
 
+
 ---
 
 ![image](https://github.com/TheWicklowWolf/Syncify/assets/111055425/025365a6-095f-4110-9c28-4be2921d6f47)

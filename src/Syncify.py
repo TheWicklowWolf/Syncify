@@ -16,9 +16,12 @@ from spotipy.oauth2 import SpotifyClientCredentials
 import concurrent.futures
 import requests
 from thefuzz import fuzz
+from urllib.parse import urlparse, parse_qs
 
 
 class DataHandler:
+    YOUTUBE_LINK_PREFIX = "https://www.youtube.com/watch?v="
+
     def __init__(self):
         logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(message)s", datefmt="%d/%m/%Y %H:%M:%S", handlers=[logging.StreamHandler(sys.stdout)])
         self.logger = logging.getLogger()
@@ -165,11 +168,8 @@ class DataHandler:
     def youtube_extractor(self, link):
         self.ytmusic = YTMusic()
         track_list = []
-
-        playlist_prefix = "https://music.youtube.com/playlist?list="
-        if playlist_prefix in link:
-            start_pos = link.find('list=') + len('list=')
-            playlist_id = link[start_pos:]
+        playlist_id = parse_qs(urlparse(link).query).get('list', [None])[0]
+        if playlist_id:
             playlist = self.ytmusic.get_playlist(playlist_id)
             playlist_name = playlist['title']
 
@@ -178,7 +178,7 @@ class DataHandler:
                 artist_str = ", ".join([a['name'] for a in track['artists']])
                 track_list.append({"Artist": artist_str, "Title": track_title, "Status": "Queued", "Folder": playlist_name, "VideoID": track['videoId']})
         else:
-            self.logger.error("Unsupported url")
+            self.logger.error("Unsupported youtube playlist url! It must have a list=<playlist_id> query params.")
 
         return track_list
 
@@ -192,7 +192,7 @@ class DataHandler:
         for item in search_results:
             cleaned_youtube_title = self.string_cleaner(item["title"]).lower()
             if cleaned_title in cleaned_youtube_title:
-                first_result = "https://www.youtube.com/watch?v=" + item["videoId"]
+                first_result = self.YOUTUBE_LINK_PREFIX + item["videoId"]
                 break
         else:
             # Try again but check for a partial match
@@ -204,11 +204,11 @@ class DataHandler:
                 artist_ratio = 100 if cleaned_artist in cleaned_youtube_artists else fuzz.ratio(cleaned_artist, cleaned_youtube_artists)
 
                 if title_ratio >= 90 and artist_ratio >= 90:
-                    first_result = "https://www.youtube.com/watch?v=" + item["videoId"]
+                    first_result = self.YOUTUBE_LINK_PREFIX + item["videoId"]
                     break
             else:
                 # Default to first result if Top result is not found
-                first_result = "https://www.youtube.com/watch?v=" + search_results[0]["videoId"]
+                first_result = self.YOUTUBE_LINK_PREFIX + search_results[0]["videoId"]
 
                 # Search for Top result specifically
                 top_search_results = self.ytmusic.search(query=cleaned_title, limit=5)
@@ -218,7 +218,7 @@ class DataHandler:
                     title_ratio = 100 if cleaned_title in cleaned_youtube_title else fuzz.ratio(cleaned_title, cleaned_youtube_title)
                     artist_ratio = 100 if cleaned_artist in cleaned_youtube_artists else fuzz.ratio(cleaned_artist, cleaned_youtube_artists)
                     if (title_ratio >= 90 and artist_ratio >= 40) or (title_ratio >= 40 and artist_ratio >= 90):
-                        first_result = "https://www.youtube.com/watch?v=" + top_search_results[0]["videoId"]
+                        first_result = self.YOUTUBE_LINK_PREFIX + top_search_results[0]["videoId"]
 
         return first_result
 
@@ -249,9 +249,9 @@ class DataHandler:
                     song_artist = song["Artist"]
                     song_title = song["Title"]
                     if song.get('VideoID'):
-                        song_list_to_download.append({"title": cleaned_full_file_name,
-                                                      "link": "https://www.youtube.com/watch?v=" + song['VideoID']})
-                        self.logger.warning("Added Song to Download List: " + cleaned_full_file_name + " : " + song['VideoID'])
+                        song_actual_link = self.YOUTUBE_LINK_PREFIX + song['VideoID']
+                        song_list_to_download.append({"title": cleaned_full_file_name, "link": song_actual_link})
+                        self.logger.warning("Added Song to Download List: " + cleaned_full_file_name + " : " + song_actual_link)
                     else:
                         future = executor.submit(self.find_youtube_link, song_artist, song_title)
                         futures.append((future, cleaned_full_file_name))
@@ -291,8 +291,7 @@ class DataHandler:
         full_file_path = os.path.join(self.playlist_folder_path, title)
         ydl_opts = {
             "ffmpeg_location": "/usr/bin/ffmpeg",
-            "format": "bestaudio[ext=m4a]",
-            "final_ext": "mp3",
+            "format": "251/best",
             "outtmpl": full_file_path,
             "quiet": False,
             "progress_hooks": [self.progress_callback],
@@ -470,9 +469,9 @@ def loadSettings():
 @socketio.on("save_playlist_settings")
 def save_playlist_settings(data):
     playlist_to_be_saved = data["playlist"]
-    playlist_id = playlist_to_be_saved["ID"]
+    playlist_name = playlist_to_be_saved["Name"]
     for playlist in data_handler.sync_list:
-        if playlist["ID"] == playlist_id:
+        if playlist["Name"] == playlist_name:
             playlist.update(playlist_to_be_saved)
             break
     else:
