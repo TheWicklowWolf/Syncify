@@ -16,9 +16,12 @@ from spotipy.oauth2 import SpotifyClientCredentials
 import concurrent.futures
 import requests
 from thefuzz import fuzz
+from urllib.parse import urlparse, parse_qs
 
 
 class DataHandler:
+    YOUTUBE_LINK_PREFIX = "https://www.youtube.com/watch?v="
+
     def __init__(self):
         logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(message)s", datefmt="%d/%m/%Y %H:%M:%S", handlers=[logging.StreamHandler(sys.stdout)])
         self.logger = logging.getLogger()
@@ -31,6 +34,7 @@ class DataHandler:
         self.spotify_client_secret = ""
         self.thread_limit = int(os.environ.get("thread_limit", 1))
         self.media_server_scan_req_flag = False
+        self.crop_album_art = os.getenv('crop_album_art', 'false').lower()
 
         if not os.path.exists(self.config_folder):
             os.makedirs(self.config_folder)
@@ -162,6 +166,24 @@ class DataHandler:
 
         return track_list
 
+    def youtube_extractor(self, link):
+        self.ytmusic = YTMusic()
+        track_list = []
+        playlist_id = parse_qs(urlparse(link).query).get('list', [None])[0]
+        if playlist_id:
+            playlist = self.ytmusic.get_playlist(playlist_id)
+            playlist_name = playlist['title']
+
+            for track in playlist['tracks']:
+                track_title = track['title']
+                artist_str = ", ".join([a['name'] for a in track['artists']])
+                track_list.append({"Artist": artist_str, "Title": track_title, "Status": "Queued", "Folder": playlist_name, "VideoID": track['videoId']})
+        else:
+            self.logger.error("Unsupported youtube playlist url! It must have a list=<playlist_id> query params.")
+
+        return track_list
+
+
     def find_youtube_link(self, artist, title):
         self.ytmusic = YTMusic()
         search_results = self.ytmusic.search(query=artist + " " + title, filter="songs", limit=5)
@@ -171,7 +193,7 @@ class DataHandler:
         for item in search_results:
             cleaned_youtube_title = self.string_cleaner(item["title"]).lower()
             if cleaned_title in cleaned_youtube_title:
-                first_result = "https://www.youtube.com/watch?v=" + item["videoId"]
+                first_result = self.YOUTUBE_LINK_PREFIX + item["videoId"]
                 break
         else:
             # Try again but check for a partial match
@@ -183,11 +205,11 @@ class DataHandler:
                 artist_ratio = 100 if cleaned_artist in cleaned_youtube_artists else fuzz.ratio(cleaned_artist, cleaned_youtube_artists)
 
                 if title_ratio >= 90 and artist_ratio >= 90:
-                    first_result = "https://www.youtube.com/watch?v=" + item["videoId"]
+                    first_result = self.YOUTUBE_LINK_PREFIX + item["videoId"]
                     break
             else:
                 # Default to first result if Top result is not found
-                first_result = "https://www.youtube.com/watch?v=" + search_results[0]["videoId"]
+                first_result = self.YOUTUBE_LINK_PREFIX + search_results[0]["videoId"]
 
                 # Search for Top result specifically
                 top_search_results = self.ytmusic.search(query=cleaned_title, limit=5)
@@ -197,14 +219,17 @@ class DataHandler:
                     title_ratio = 100 if cleaned_title in cleaned_youtube_title else fuzz.ratio(cleaned_title, cleaned_youtube_title)
                     artist_ratio = 100 if cleaned_artist in cleaned_youtube_artists else fuzz.ratio(cleaned_artist, cleaned_youtube_artists)
                     if (title_ratio >= 90 and artist_ratio >= 40) or (title_ratio >= 40 and artist_ratio >= 90):
-                        first_result = "https://www.youtube.com/watch?v=" + top_search_results[0]["videoId"]
+                        first_result = self.YOUTUBE_LINK_PREFIX + top_search_results[0]["videoId"]
 
         return first_result
 
     def get_download_list(self, playlist):
         playlist_name = playlist["Name"]
         playlist_link = playlist["Link"]
-        playlist_tracks = self.spotify_extractor(playlist_link)
+        if "youtube" in playlist_link:
+            playlist_tracks = self.youtube_extractor(playlist_link)
+        else:
+            playlist_tracks = self.spotify_extractor(playlist_link)
 
         playlist_folder = playlist_name
         self.playlist_folder_path = os.path.join(self.download_folder, playlist_folder)
@@ -224,9 +249,14 @@ class DataHandler:
                 if cleaned_full_file_name not in directory_list:
                     song_artist = song["Artist"]
                     song_title = song["Title"]
-                    future = executor.submit(self.find_youtube_link, song_artist, song_title)
-                    futures.append((future, cleaned_full_file_name))
-                    self.logger.warning("Searching for Song: " + cleaned_full_file_name)
+                    if song.get('VideoID'):
+                        song_actual_link = self.YOUTUBE_LINK_PREFIX + song['VideoID']
+                        song_list_to_download.append({"title": cleaned_full_file_name, "link": song_actual_link})
+                        self.logger.warning("Added Song to Download List: " + cleaned_full_file_name + " : " + song_actual_link)
+                    else:
+                        future = executor.submit(self.find_youtube_link, song_artist, song_title)
+                        futures.append((future, cleaned_full_file_name))
+                        self.logger.warning("Searching for Song: " + cleaned_full_file_name)
                 else:
                     self.logger.warning("File Already in folder: " + cleaned_full_file_name)
 
@@ -262,7 +292,7 @@ class DataHandler:
         full_file_path = os.path.join(self.playlist_folder_path, title)
         ydl_opts = {
             "ffmpeg_location": "/usr/bin/ffmpeg",
-            "format": "251/best",
+            "format": "251/bestaudio",
             "outtmpl": full_file_path,
             "quiet": False,
             "progress_hooks": [self.progress_callback],
@@ -279,8 +309,17 @@ class DataHandler:
                 {
                     "key": "FFmpegMetadata",
                 },
-            ],
+            ]
         }
+
+        if self.crop_album_art == 'true':
+            ydl_opts["postprocessor_args"] = {
+                'thumbnailsconvertor+ffmpeg_o': ['-c:v',
+                                                 'mjpeg',
+                                                 '-vf',
+                                                 "crop='if(gt(ih,iw),iw,ih)':'if(gt(iw,ih),ih,iw)'"]
+            }
+
         if self.cookies_path:
             ydl_opts["cookiefile"] = self.cookies_path
 
