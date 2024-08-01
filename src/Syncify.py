@@ -292,7 +292,7 @@ class DataHandler:
         full_file_path = os.path.join(self.playlist_folder_path, title)
         ydl_opts = {
             "ffmpeg_location": "/usr/bin/ffmpeg",
-            "format": "251/best",
+            "format": "251/bestaudio",
             "outtmpl": full_file_path,
             "quiet": False,
             "progress_hooks": [self.progress_callback],
