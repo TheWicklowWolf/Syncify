@@ -1,22 +1,22 @@
-import logging
+import re
 import os
 import sys
+import json
 import time
+import logging
 import datetime
 import threading
-import re
+import concurrent.futures
+from urllib.parse import urlparse, parse_qs
 from flask import Flask, render_template
 from flask_socketio import SocketIO
 from ytmusicapi import YTMusic
 import yt_dlp
-import json
 from plexapi.server import PlexServer
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
-import concurrent.futures
 import requests
 from thefuzz import fuzz
-from urllib.parse import urlparse, parse_qs
 
 
 class DataHandler:
@@ -34,7 +34,7 @@ class DataHandler:
         self.spotify_client_secret = ""
         self.thread_limit = int(os.environ.get("thread_limit", 1))
         self.media_server_scan_req_flag = False
-        self.crop_album_art = os.getenv('crop_album_art', 'false').lower()
+        self.crop_album_art = os.getenv("crop_album_art", "false").lower()
 
         if not os.path.exists(self.config_folder):
             os.makedirs(self.config_folder)
@@ -72,7 +72,7 @@ class DataHandler:
             self.spotify_client_secret = ret["spotify_client_secret"]
 
         except Exception as e:
-            self.logger.error("Error Loading Config: " + str(e))
+            self.logger.error(f"Error Loading Config: {str(e)}")
 
     def save_to_file(self):
         try:
@@ -91,7 +91,7 @@ class DataHandler:
                 )
 
         except Exception as e:
-            self.logger.error("Error Saving Config: " + str(e))
+            self.logger.error(f"Error Saving Config: {str(e)}")
 
     def load_sync_list_from_file(self):
         try:
@@ -99,7 +99,7 @@ class DataHandler:
                 self.sync_list = json.load(json_file)
 
         except Exception as e:
-            self.logger.error("Error Loading Playlists: " + str(e))
+            self.logger.error(f"Error Loading Playlists: {str(e)}")
 
     def save_sync_list_to_file(self):
         try:
@@ -107,21 +107,24 @@ class DataHandler:
                 json.dump(self.sync_list, json_file, indent=4)
 
         except Exception as e:
-            self.logger.error("Error Saving Playlists: " + str(e))
+            self.logger.error(f"Error Saving Playlists: {str(e)}")
 
     def schedule_checker(self):
+        self.logger.warning("Starting periodic checks every 10 minutes to monitor sync start times.")
+        self.logger.warning(f"Current scheduled hours to start sync (in 24-hour format): {self.sync_start_times}")
+
         while True:
             current_time = datetime.datetime.now().time()
             within_sync_window = any(datetime.time(t, 0, 0) <= current_time <= datetime.time(t, 59, 59) for t in self.sync_start_times)
 
             if within_sync_window:
-                self.logger.warning("Time to Start Sync - as in a time window " + str(self.sync_start_times))
+                self.logger.warning(f"Time to Start Sync - as in a time window {self.sync_start_times}")
                 self.master_queue()
                 self.logger.warning("Big sleep for 1 Hour - Sync Done")
                 time.sleep(3600)
-                self.logger.warning("Checking every 60 seconds as not in sync time window " + str(self.sync_start_times))
+                self.logger.warning(f"Checking every 10 minutes as not in sync time window {self.sync_start_times}")
             else:
-                time.sleep(60)
+                time.sleep(600)
 
     def spotify_extractor(self, link):
         sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(client_id=self.spotify_client_id, client_secret=self.spotify_client_secret))
@@ -169,24 +172,23 @@ class DataHandler:
     def youtube_extractor(self, link):
         self.ytmusic = YTMusic()
         track_list = []
-        playlist_id = parse_qs(urlparse(link).query).get('list', [None])[0]
+        playlist_id = parse_qs(urlparse(link).query).get("list", [None])[0]
         if playlist_id:
             playlist = self.ytmusic.get_playlist(playlist_id)
-            playlist_name = playlist['title']
+            playlist_name = playlist["title"]
 
-            for track in playlist['tracks']:
-                track_title = track['title']
-                artist_str = ", ".join([a['name'] for a in track['artists']])
-                track_list.append({"Artist": artist_str, "Title": track_title, "Status": "Queued", "Folder": playlist_name, "VideoID": track['videoId']})
+            for track in playlist["tracks"]:
+                track_title = track["title"]
+                artist_str = ", ".join([a["name"] for a in track["artists"]])
+                track_list.append({"Artist": artist_str, "Title": track_title, "Status": "Queued", "Folder": playlist_name, "VideoID": track["videoId"]})
         else:
             self.logger.error("Unsupported youtube playlist url! It must have a list=<playlist_id> query params.")
 
         return track_list
 
-
     def find_youtube_link(self, artist, title):
         self.ytmusic = YTMusic()
-        search_results = self.ytmusic.search(query=artist + " " + title, filter="songs", limit=5)
+        search_results = self.ytmusic.search(query=f"{artist} - {title}", filter="songs", limit=5)
         first_result = None
         cleaned_artist = self.string_cleaner(artist).lower()
         cleaned_title = self.string_cleaner(title).lower()
@@ -244,29 +246,29 @@ class DataHandler:
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.thread_limit) as executor:
             futures = []
             for song in playlist_tracks:
-                full_file_name = song["Title"] + " - " + song["Artist"]
+                full_file_name = f'{song["Title"]} - {song["Artist"]}'
                 cleaned_full_file_name = self.string_cleaner(full_file_name)
                 if cleaned_full_file_name not in directory_list:
                     song_artist = song["Artist"]
                     song_title = song["Title"]
-                    if song.get('VideoID'):
-                        song_actual_link = self.YOUTUBE_LINK_PREFIX + song['VideoID']
+                    if song.get("VideoID"):
+                        song_actual_link = self.YOUTUBE_LINK_PREFIX + song["VideoID"]
                         song_list_to_download.append({"title": cleaned_full_file_name, "link": song_actual_link})
-                        self.logger.warning("Added Song to Download List: " + cleaned_full_file_name + " : " + song_actual_link)
+                        self.logger.warning(f"Added Song to Download List: {cleaned_full_file_name} : {song_actual_link}")
                     else:
                         future = executor.submit(self.find_youtube_link, song_artist, song_title)
                         futures.append((future, cleaned_full_file_name))
-                        self.logger.warning("Searching for Song: " + cleaned_full_file_name)
+                        self.logger.warning(f"Searching for Song: {cleaned_full_file_name}")
                 else:
-                    self.logger.warning("File Already in folder: " + cleaned_full_file_name)
+                    self.logger.warning(f"File Already in folder: {cleaned_full_file_name}")
 
             for future, file_name in futures:
                 song_actual_link = future.result()
                 if song_actual_link:
                     song_list_to_download.append({"title": file_name, "link": song_actual_link})
-                    self.logger.warning("Added Song to Download List: " + file_name + " : " + song_actual_link)
+                    self.logger.warning(f"Added Song to Download List: {file_name} : {song_actual_link}")
                 else:
-                    self.logger.error("No Link Found for: " + file_name)
+                    self.logger.error(f"No Link Found for: {file_name}")
 
         return song_list_to_download
 
@@ -309,26 +311,21 @@ class DataHandler:
                 {
                     "key": "FFmpegMetadata",
                 },
-            ]
+            ],
         }
 
-        if self.crop_album_art == 'true':
-            ydl_opts["postprocessor_args"] = {
-                'thumbnailsconvertor+ffmpeg_o': ['-c:v',
-                                                 'mjpeg',
-                                                 '-vf',
-                                                 "crop='if(gt(ih,iw),iw,ih)':'if(gt(iw,ih),ih,iw)'"]
-            }
+        if self.crop_album_art == "true":
+            ydl_opts["postprocessor_args"] = {"thumbnailsconvertor+ffmpeg_o": ["-c:v", "mjpeg", "-vf", "crop='if(gt(ih,iw),iw,ih)':'if(gt(iw,ih),ih,iw)'"]}
 
         if self.cookies_path:
             ydl_opts["cookiefile"] = self.cookies_path
 
         try:
             yt_downloader = yt_dlp.YoutubeDL(ydl_opts)
-            self.logger.warning("yt_dl Start : " + link)
+            self.logger.warning(f"yt_dlp - Starting Download of: {link}")
 
             yt_downloader.download([link])
-            self.logger.warning("yt_dl Complete : " + link)
+            self.logger.warning(f"yt_dlp - Finished Download of: {link}")
 
             time.sleep(sleep)
 
@@ -338,6 +335,7 @@ class DataHandler:
     def progress_callback(self, d):
         if d["status"] == "finished":
             self.logger.warning("Download complete")
+            self.logger.warning("Processing File...")
 
         elif d["status"] == "downloading":
             self.logger.warning(f'Downloaded {d["_percent_str"]} of {d["_total_bytes_str"]} at {d["_speed_str"]}')
@@ -347,16 +345,16 @@ class DataHandler:
             self.media_server_scan_req_flag = False
             self.logger.warning("Sync Task started...")
             for playlist in self.sync_list:
-                logging.warning("Looking for Playlist Songs on YouTube: " + playlist["Name"])
+                logging.warning(f'Looking for Playlist Songs on YouTube: {playlist["Name"]}')
                 song_list = self.get_download_list(playlist)
 
-                logging.warning("Starting Downloading List: " + playlist["Name"])
+                logging.warning(f'Starting Downloading List: {playlist["Name"]}')
                 self.download_queue(song_list, playlist)
 
-                logging.warning("Finished Downloading List: " + playlist["Name"])
+                logging.warning(f'Finished Downloading List: {playlist["Name"]}')
 
                 playlist["Song_Count"] = len(os.listdir(self.playlist_folder_path))
-                logging.warning("Files in Directory: " + str(playlist["Song_Count"]))
+                logging.warning(f'Files in Directory: {str(playlist["Song_Count"])}')
 
                 playlist["Last_Synced"] = datetime.datetime.now().strftime("%d-%m-%y %H:%M:%S")
 
@@ -392,7 +390,8 @@ class DataHandler:
                 library_section.update()
                 self.logger.warning(f"Plex Library scan for '{self.media_server_library_name}' started.")
             except Exception as e:
-                self.logger.warning(f"Plex Library scan failed: " + str(e))
+                self.logger.warning(f"Plex Library scan failed: {str(e)}")
+
         if "Jellyfin" in media_tokens and "Jellyfin" in media_tokens:
             try:
                 token = media_tokens.get("Jellyfin")
@@ -405,7 +404,7 @@ class DataHandler:
                 else:
                     self.logger.warning(f"Jellyfin Error: {response.status_code}, {response.text}")
             except Exception as e:
-                self.logger.warning(f"Jellyfin Library scan failed: " + str(e))
+                self.logger.warning(f"Jellyfin Library scan failed: {str(e)}")
 
     def string_cleaner(self, input_string):
         if isinstance(input_string, str):
@@ -499,10 +498,10 @@ def updateSettings(data):
         data_handler.sync_start_times = cleaned_sync_start_times
 
     except Exception as e:
-        data_handler.logger.error(str(e))
+        data_handler.logger.error(f"Error Parsing Schedule: {str(e)}")
         data_handler.sync_start_times = [0]
     finally:
-        data_handler.logger.warning("Sync Times: " + str(data_handler.sync_start_times))
+        data_handler.logger.warning(f"Sync Times: {str(data_handler.sync_start_times)}")
     data_handler.save_to_file()
 
 
