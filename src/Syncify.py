@@ -300,6 +300,7 @@ class DataHandler:
         sleep = playlist["Sleep"] if playlist["Sleep"] else 0
         full_file_path = os.path.join(self.playlist_folder_path, title)
         ydl_opts = {
+            "logger": self.logger,
             "ffmpeg_location": "/usr/bin/ffmpeg",
             "format": "251/bestaudio",
             "outtmpl": full_file_path,
