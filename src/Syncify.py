@@ -147,14 +147,14 @@ class DataHandler:
                     artists = [artist["name"] for artist in item["artists"]]
                     artists_str = ", ".join(artists)
                     track_list.append({"Artist": artists_str, "Title": track_title, "Status": "Queued", "Folder": album_name})
-                except:
-                    pass
+                except Exception as e:
+                    self.logger.error(f"Error Parsing Item in Album: {str(item)} - {str(e)}")
 
         else:
             playlist = sp.playlist(link)
             playlist_name = playlist["name"]
             number_of_tracks = playlist["tracks"]["total"]
-            fields = "items.track(name,artists.name)"
+            fields = "items(track(name,artists(name)),added_at)"
 
             offset = 0
             limit = 100
@@ -164,15 +164,17 @@ class DataHandler:
                 all_items.extend(results["items"])
                 offset += limit
 
-            for item in all_items:
+            all_items_sorted = sorted(all_items, key=lambda x: x["added_at"], reverse=False)
+            for item in all_items_sorted:
                 try:
                     track = item["track"]
                     track_title = track["name"]
                     artists = [artist["name"] for artist in track["artists"]]
                     artists_str = ", ".join(artists)
                     track_list.append({"Artist": artists_str, "Title": track_title, "Status": "Queued", "Folder": playlist_name})
-                except:
-                    pass
+
+                except Exception as e:
+                    self.logger.error(f"Error Parsing Item in Playlist: {str(item)} - {str(e)}")
 
         return track_list
 
@@ -194,90 +196,102 @@ class DataHandler:
         return track_list
 
     def find_youtube_link(self, artist, title):
-        self.ytmusic = YTMusic()
-        search_results = self.ytmusic.search(query=f"{artist} - {title}", filter="songs", limit=5)
-        first_result = None
-        cleaned_artist = self.string_cleaner(artist).lower()
-        cleaned_title = self.string_cleaner(title).lower()
-        for item in search_results:
-            cleaned_youtube_title = self.string_cleaner(item["title"]).lower()
-            if cleaned_title in cleaned_youtube_title:
-                first_result = self.YOUTUBE_LINK_PREFIX + item["videoId"]
-                break
-        else:
-            # Try again but check for a partial match
+        try:
+            first_result = None
+
+            self.ytmusic = YTMusic()
+            search_results = self.ytmusic.search(query=f"{artist} - {title}", filter="songs", limit=5)
+
+            cleaned_artist = self.string_cleaner(artist).lower()
+            cleaned_title = self.string_cleaner(title).lower()
             for item in search_results:
                 cleaned_youtube_title = self.string_cleaner(item["title"]).lower()
-                cleaned_youtube_artists = ", ".join(self.string_cleaner(x["name"]).lower() for x in item["artists"])
-
-                title_ratio = 100 if all(word in cleaned_title for word in cleaned_youtube_title.split()) else fuzz.ratio(cleaned_title, cleaned_youtube_title)
-                artist_ratio = 100 if cleaned_artist in cleaned_youtube_artists else fuzz.ratio(cleaned_artist, cleaned_youtube_artists)
-
-                if title_ratio >= 90 and artist_ratio >= 90:
+                if cleaned_title in cleaned_youtube_title:
                     first_result = self.YOUTUBE_LINK_PREFIX + item["videoId"]
                     break
             else:
-                # Default to first result if Top result is not found
-                first_result = self.YOUTUBE_LINK_PREFIX + search_results[0]["videoId"]
+                # Try again but check for a partial match
+                for item in search_results:
+                    cleaned_youtube_title = self.string_cleaner(item["title"]).lower()
+                    cleaned_youtube_artists = ", ".join(self.string_cleaner(x["name"]).lower() for x in item["artists"])
 
-                # Search for Top result specifically
-                top_search_results = self.ytmusic.search(query=cleaned_title, limit=5)
-                cleaned_youtube_title = self.string_cleaner(top_search_results[0]["title"]).lower()
-                if "Top result" in top_search_results[0]["category"] and top_search_results[0]["resultType"] == "song" or top_search_results[0]["resultType"] == "video":
-                    cleaned_youtube_artists = ", ".join(self.string_cleaner(x["name"]).lower() for x in top_search_results[0]["artists"])
-                    title_ratio = 100 if cleaned_title in cleaned_youtube_title else fuzz.ratio(cleaned_title, cleaned_youtube_title)
+                    title_ratio = 100 if all(word in cleaned_title for word in cleaned_youtube_title.split()) else fuzz.ratio(cleaned_title, cleaned_youtube_title)
                     artist_ratio = 100 if cleaned_artist in cleaned_youtube_artists else fuzz.ratio(cleaned_artist, cleaned_youtube_artists)
-                    if (title_ratio >= 90 and artist_ratio >= 40) or (title_ratio >= 40 and artist_ratio >= 90):
-                        first_result = self.YOUTUBE_LINK_PREFIX + top_search_results[0]["videoId"]
 
-        return first_result
+                    if title_ratio >= 90 and artist_ratio >= 90:
+                        first_result = self.YOUTUBE_LINK_PREFIX + item["videoId"]
+                        break
+                else:
+                    # Default to first result if Top result is not found
+                    first_result = self.YOUTUBE_LINK_PREFIX + search_results[0]["videoId"]
+
+                    # Search for Top result specifically
+                    top_search_results = self.ytmusic.search(query=cleaned_title, limit=5)
+                    cleaned_youtube_title = self.string_cleaner(top_search_results[0]["title"]).lower()
+                    if "Top result" in top_search_results[0]["category"] and top_search_results[0]["resultType"] == "song" or top_search_results[0]["resultType"] == "video":
+                        cleaned_youtube_artists = ", ".join(self.string_cleaner(x["name"]).lower() for x in top_search_results[0]["artists"])
+                        title_ratio = 100 if cleaned_title in cleaned_youtube_title else fuzz.ratio(cleaned_title, cleaned_youtube_title)
+                        artist_ratio = 100 if cleaned_artist in cleaned_youtube_artists else fuzz.ratio(cleaned_artist, cleaned_youtube_artists)
+                        if (title_ratio >= 90 and artist_ratio >= 40) or (title_ratio >= 40 and artist_ratio >= 90):
+                            first_result = self.YOUTUBE_LINK_PREFIX + top_search_results[0]["videoId"]
+
+        except Exception as e:
+            self.logger.error(f"Error Finding YouTube Link: {str(e)}")
+
+        finally:
+            return first_result
 
     def get_download_list(self, playlist):
-        playlist_name = playlist["Name"]
-        playlist_link = playlist["Link"]
-        if "youtube" in playlist_link:
-            playlist_tracks = self.youtube_extractor(playlist_link)
-        else:
-            playlist_tracks = self.spotify_extractor(playlist_link)
+        try:
+            song_list_to_download = []
+            playlist_name = playlist["Name"]
+            playlist_link = playlist["Link"]
+            if "youtube" in playlist_link:
+                playlist_tracks = self.youtube_extractor(playlist_link)
+            else:
+                playlist_tracks = self.spotify_extractor(playlist_link)
 
-        playlist_folder = playlist_name
-        self.playlist_folder_path = os.path.join(self.download_folder, playlist_folder)
+            playlist_folder = playlist_name
+            self.playlist_folder_path = os.path.join(self.download_folder, playlist_folder)
 
-        if not os.path.exists(self.playlist_folder_path):
-            os.makedirs(self.playlist_folder_path)
+            if not os.path.exists(self.playlist_folder_path):
+                os.makedirs(self.playlist_folder_path)
 
-        raw_directory_list = os.listdir(self.playlist_folder_path)
-        directory_list = self.string_cleaner(raw_directory_list)
+            raw_directory_list = os.listdir(self.playlist_folder_path)
+            directory_list = self.string_cleaner(raw_directory_list)
 
-        song_list_to_download = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.thread_limit) as executor:
-            futures = []
-            for song in playlist_tracks:
-                full_file_name = f'{song["Title"]} - {song["Artist"]}'
-                cleaned_full_file_name = self.string_cleaner(full_file_name)
-                if cleaned_full_file_name not in directory_list:
-                    song_artist = song["Artist"]
-                    song_title = song["Title"]
-                    if song.get("VideoID"):
-                        song_actual_link = self.YOUTUBE_LINK_PREFIX + song["VideoID"]
-                        song_list_to_download.append({"title": cleaned_full_file_name, "link": song_actual_link})
-                        self.logger.warning(f"Added Song to Download List: {cleaned_full_file_name} : {song_actual_link}")
+            with concurrent.futures.ThreadPoolExecutor(max_workers=self.thread_limit) as executor:
+                futures = []
+                for song in playlist_tracks:
+                    full_file_name = f'{song["Title"]} - {song["Artist"]}'
+                    cleaned_full_file_name = self.string_cleaner(full_file_name)
+                    if cleaned_full_file_name not in directory_list:
+                        song_artist = song["Artist"]
+                        song_title = song["Title"]
+                        if song.get("VideoID"):
+                            song_actual_link = self.YOUTUBE_LINK_PREFIX + song["VideoID"]
+                            song_list_to_download.append({"title": cleaned_full_file_name, "link": song_actual_link})
+                            self.logger.warning(f"Added Song to Download List: {cleaned_full_file_name} : {song_actual_link}")
+                        else:
+                            future = executor.submit(self.find_youtube_link, song_artist, song_title)
+                            futures.append((future, cleaned_full_file_name))
+                            self.logger.warning(f"Searching for Song: {cleaned_full_file_name}")
                     else:
-                        future = executor.submit(self.find_youtube_link, song_artist, song_title)
-                        futures.append((future, cleaned_full_file_name))
-                        self.logger.warning(f"Searching for Song: {cleaned_full_file_name}")
-                else:
-                    self.logger.warning(f"File Already in folder: {cleaned_full_file_name}")
+                        self.logger.warning(f"File Already in folder: {cleaned_full_file_name}")
 
-            for future, file_name in futures:
-                song_actual_link = future.result()
-                if song_actual_link:
-                    song_list_to_download.append({"title": file_name, "link": song_actual_link})
-                    self.logger.warning(f"Added Song to Download List: {file_name} : {song_actual_link}")
-                else:
-                    self.logger.error(f"No Link Found for: {file_name}")
+                for future, file_name in futures:
+                    song_actual_link = future.result()
+                    if song_actual_link:
+                        song_list_to_download.append({"title": file_name, "link": song_actual_link})
+                        self.logger.warning(f"Added Song to Download List: {file_name} : {song_actual_link}")
+                    else:
+                        self.logger.error(f"No Link Found for: {file_name}")
 
-        return song_list_to_download
+        except Exception as e:
+            self.logger.error(f"Error Getting Download List: {str(e)}")
+
+        finally:
+            return song_list_to_download
 
     def download_queue(self, song_list, playlist):
         try:
@@ -290,7 +304,7 @@ class DataHandler:
                 concurrent.futures.wait(futures)
 
         except Exception as e:
-            self.logger.error(str(e))
+            self.logger.error(f"Error in Download Queue: {str(e)}")
 
     def download_song(self, song, playlist):
         if self.media_server_scan_req_flag == False:
@@ -307,6 +321,7 @@ class DataHandler:
             "quiet": False,
             "progress_hooks": [self.progress_callback],
             "writethumbnail": True,
+            "updatetime": False,
             "postprocessors": [
                 {
                     "key": "FFmpegExtractAudio",
@@ -376,7 +391,7 @@ class DataHandler:
                 self.logger.warning("Media Server Sync not required")
 
         except Exception as e:
-            self.logger.error(str(e))
+            self.logger.error(f"Error in Master Queue: {str(e)}")
             self.logger.warning("Finished: Incomplete")
 
         else:
@@ -497,6 +512,7 @@ def updateSettings(data):
     data_handler.media_server_library_name = data["media_server_library_name"]
     data_handler.spotify_client_id = data["spotify_client_id"]
     data_handler.spotify_client_secret = data["spotify_client_secret"]
+
     try:
         if data["sync_start_times"] == "":
             raise Exception("No Time Entered, defaulting to 00:00")
@@ -508,8 +524,10 @@ def updateSettings(data):
     except Exception as e:
         data_handler.logger.error(f"Error Parsing Schedule: {str(e)}")
         data_handler.sync_start_times = [0]
+
     finally:
         data_handler.logger.warning(f"Sync Times: {str(data_handler.sync_start_times)}")
+
     data_handler.save_to_file()
 
 
