@@ -46,9 +46,7 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <div id="save-message" style="display: none;" class="alert alert-success mt-3">
-            Settings saved successfully.
-          </div>
+          <div id="save-message" style="display: none;" class="alert alert-success mt-3"></div>
           <div class="form-group-modal ">
             <label for="sync_start_times">Sync Schedule:</label>
             <input type="text" class="form-control" id="sync_start_times"
@@ -80,7 +78,8 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-          <button type="button" id="save-changes-button" class="btn btn-primary">Save changes</button>
+          <button type="button" id="save-changes-button" class="btn btn-primary">Save</button>
+          <button type="button" id="manual-start-button" class="btn btn-info">Manual Start</button>
           <i class="fa fa-sun"></i>
           <div class="form-check form-switch">
             <input class="form-check-input rounded" type="checkbox" id="themeSwitch">

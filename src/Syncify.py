@@ -62,6 +62,7 @@ class DataHandler:
 
         full_cookies_path = os.path.join(self.config_folder, "cookies.txt")
         self.cookies_path = full_cookies_path if os.path.exists(full_cookies_path) else None
+        self.sync_in_progress_flag = False
 
         task_thread = threading.Thread(target=self.schedule_checker)
         task_thread.daemon = True
@@ -124,12 +125,17 @@ class DataHandler:
             current_time = datetime.datetime.now().time()
             within_sync_window = any(datetime.time(t, 0, 0) <= current_time <= datetime.time(t, 59, 59) for t in self.sync_start_times)
 
-            if within_sync_window:
+            if within_sync_window and self.sync_in_progress_flag:
+                self.logger.warning(f"Sync already in progress")
+                time.sleep(600)
+
+            elif within_sync_window and not self.sync_in_progress_flag:
                 self.logger.warning(f"Time to Start Sync - as in a time window {self.sync_start_times}")
                 self.master_queue()
                 self.logger.warning("Big sleep for 1 Hour - Sync Done")
                 time.sleep(3600)
                 self.logger.warning(f"Checking every 10 minutes as not in sync time window {self.sync_start_times}")
+
             else:
                 time.sleep(600)
 
@@ -147,6 +153,7 @@ class DataHandler:
                     artists = [artist["name"] for artist in item["artists"]]
                     artists_str = ", ".join(artists)
                     track_list.append({"Artist": artists_str, "Title": track_title, "Status": "Queued", "Folder": album_name})
+
                 except Exception as e:
                     self.logger.error(f"Error Parsing Item in Album: {str(item)} - {str(e)}")
 
@@ -365,6 +372,7 @@ class DataHandler:
 
     def master_queue(self):
         try:
+            self.sync_in_progress_flag = True
             self.media_server_scan_req_flag = False
             self.logger.warning("Sync Task started...")
             for playlist in self.sync_list:
@@ -396,6 +404,9 @@ class DataHandler:
 
         else:
             self.logger.warning("Finished: Complete")
+
+        finally:
+            self.sync_in_progress_flag = False
 
     def add_playlist(self, playlist):
         self.sync_list.extend(playlist)
@@ -459,6 +470,15 @@ class DataHandler:
                 result[key.strip()] = value.strip()
 
         return result
+
+    def manual_start(self):
+        if self.sync_in_progress_flag == True:
+            self.logger.warning(f"Sync already in progress.")
+
+        else:
+            self.logger.warning("Manual Sync triggered.")
+            task_thread = threading.Thread(target=self.master_queue, daemon=True)
+            task_thread.start()
 
 
 app = Flask(__name__)
@@ -540,6 +560,11 @@ def add_playlist(data):
 def save_playlists(data):
     data_handler.sync_list = data["Saved_sync_list"]
     data_handler.save_sync_list_to_file()
+
+
+@socketio.on("manual_start")
+def manual_start():
+    data_handler.manual_start()
 
 
 if __name__ == "__main__":

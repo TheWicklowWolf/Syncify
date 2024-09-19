@@ -2,6 +2,7 @@
 var config_modal = document.getElementById('config-modal');
 var save_message = document.getElementById("save-message");
 var save_changes_button = document.getElementById("save-changes-button");
+const manual_start_button = document.getElementById("manual-start-button");
 var save_sync_list = document.getElementById("save-sync-list");
 var save_sync_list_msg = document.getElementById("save-sync-list-msg");
 var sync_start_times = document.getElementById("sync_start_times");
@@ -140,6 +141,7 @@ save_changes_button.addEventListener("click", () => {
         "spotify_client_secret": spotify_client_secret.value,
     });
     save_message.style.display = "block";
+    save_message.textContent = "Settings saved successfully.";
     setTimeout(function () {
         save_message.style.display = "none";
     }, 1000);
@@ -153,6 +155,15 @@ save_sync_list.addEventListener("click", () => {
         save_sync_list_msg.textContent = "";
         save_message.style.display = "none";
     }, 3000);
+});
+
+manual_start_button.addEventListener("click", () => {
+    socket.emit("manual_start");
+    save_message.style.display = "block";
+    save_message.textContent = "Manual Start Initiated.";
+    setTimeout(function () {
+        save_message.style.display = "none";
+    }, 1000);
 });
 
 const themeSwitch = document.getElementById('themeSwitch');
