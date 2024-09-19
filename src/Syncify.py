@@ -126,7 +126,8 @@ class DataHandler:
             within_sync_window = any(datetime.time(t, 0, 0) <= current_time <= datetime.time(t, 59, 59) for t in self.sync_start_times)
 
             if within_sync_window and self.sync_in_progress_flag:
-                self.logger.warning(f"Sync already in progress")
+                self.logger.warning(f"In Sync Window but sync already in progress.")
+                self.logger.warning(f"Checking again in 10 minutes.")
                 time.sleep(600)
 
             elif within_sync_window and not self.sync_in_progress_flag:
@@ -472,11 +473,12 @@ class DataHandler:
         return result
 
     def manual_start(self):
+        self.logger.warning("Manual Sync Requested.")
+
         if self.sync_in_progress_flag == True:
             self.logger.warning(f"Sync already in progress.")
-
         else:
-            self.logger.warning("Manual Sync triggered.")
+            self.logger.warning("Manual Sync Started.")
             task_thread = threading.Thread(target=self.master_queue, daemon=True)
             task_thread.start()
 
