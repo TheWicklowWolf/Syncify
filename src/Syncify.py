@@ -315,8 +315,8 @@ class DataHandler:
             self.logger.error(f"Error in Download Queue: {str(e)}")
 
     def download_song(self, song, playlist):
-        if self.media_server_scan_req_flag == False:
-            self.media_server_scan_req_flag = True
+        self.media_server_scan_req_flag = True
+
         link = song["link"]
         title = song["title"]
         sleep = playlist["Sleep"] if playlist["Sleep"] else 0
@@ -415,6 +415,7 @@ class DataHandler:
     def sync_media_servers(self):
         media_servers = self.convert_string_to_dict(self.media_server_addresses)
         media_tokens = self.convert_string_to_dict(self.media_server_tokens)
+
         if "Plex" in media_servers and "Plex" in media_tokens:
             try:
                 token = media_tokens.get("Plex")
@@ -424,6 +425,7 @@ class DataHandler:
                 library_section = media_server_server.library.section(self.media_server_library_name)
                 library_section.update()
                 self.logger.warning(f"Plex Library scan for '{self.media_server_library_name}' started.")
+
             except Exception as e:
                 self.logger.warning(f"Plex Library scan failed: {str(e)}")
 
@@ -438,6 +440,7 @@ class DataHandler:
                     self.logger.warning("Jellyfin Library refresh request successful.")
                 else:
                     self.logger.warning(f"Jellyfin Error: {response.status_code}, {response.text}")
+
             except Exception as e:
                 self.logger.warning(f"Jellyfin Library scan failed: {str(e)}")
 
@@ -477,6 +480,7 @@ class DataHandler:
 
         if self.sync_in_progress_flag == True:
             self.logger.warning(f"Sync already in progress.")
+
         else:
             self.logger.warning("Manual Sync Started.")
             task_thread = threading.Thread(target=self.master_queue, daemon=True)
@@ -516,32 +520,39 @@ def loadSettings():
 
 @socketio.on("save_playlist_settings")
 def save_playlist_settings(data):
-    playlist_to_be_saved = data["playlist"]
-    playlist_name = playlist_to_be_saved["Name"]
-    for playlist in data_handler.sync_list:
-        if playlist["Name"] == playlist_name:
-            playlist.update(playlist_to_be_saved)
-            break
-    else:
-        data_handler.sync_list.append(playlist_to_be_saved)
-    data_handler.save_sync_list_to_file()
+    try:
+        playlist_to_be_saved = data["playlist"]
+        playlist_name = playlist_to_be_saved["Name"]
+        for playlist in data_handler.sync_list:
+            if playlist["Name"] == playlist_name:
+                playlist.update(playlist_to_be_saved)
+                break
+        else:
+            data_handler.sync_list.append(playlist_to_be_saved)
+
+        data_handler.save_sync_list_to_file()
+
+    except Exception as e:
+        data_handler.logger.error(f"Error Saving Playlist Settings: {str(e)}")
 
 
 @socketio.on("updateSettings")
 def updateSettings(data):
-    data_handler.media_server_addresses = data["media_server_addresses"]
-    data_handler.media_server_tokens = data["media_server_tokens"]
-    data_handler.media_server_library_name = data["media_server_library_name"]
-    data_handler.spotify_client_id = data["spotify_client_id"]
-    data_handler.spotify_client_secret = data["spotify_client_secret"]
-
     try:
+        data_handler.media_server_addresses = data["media_server_addresses"]
+        data_handler.media_server_tokens = data["media_server_tokens"]
+        data_handler.media_server_library_name = data["media_server_library_name"]
+        data_handler.spotify_client_id = data["spotify_client_id"]
+        data_handler.spotify_client_secret = data["spotify_client_secret"]
+
         if data["sync_start_times"] == "":
-            raise Exception("No Time Entered, defaulting to 00:00")
-        raw_sync_start_times = [int(re.sub(r"\D", "", start_time.strip())) for start_time in data["sync_start_times"].split(",")]
-        temp_sync_start_times = [0 if x < 0 or x > 23 else x for x in raw_sync_start_times]
-        cleaned_sync_start_times = sorted(list(set(temp_sync_start_times)))
-        data_handler.sync_start_times = cleaned_sync_start_times
+            data_handler.sync_start_times = []
+
+        else:
+            raw_sync_start_times = [int(re.sub(r"\D", "", start_time.strip())) for start_time in data["sync_start_times"].split(",")]
+            temp_sync_start_times = [0 if x < 0 or x > 23 else x for x in raw_sync_start_times]
+            cleaned_sync_start_times = sorted(list(set(temp_sync_start_times)))
+            data_handler.sync_start_times = cleaned_sync_start_times
 
     except Exception as e:
         data_handler.logger.error(f"Error Parsing Schedule: {str(e)}")
@@ -549,8 +560,7 @@ def updateSettings(data):
 
     finally:
         data_handler.logger.warning(f"Sync Times: {str(data_handler.sync_start_times)}")
-
-    data_handler.save_to_file()
+        data_handler.save_to_file()
 
 
 @socketio.on("add_playlist")
