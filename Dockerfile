@@ -8,11 +8,10 @@ ENV RELEASE_VERSION=${RELEASE_VERSION}
 RUN apk update && apk add --no-cache ffmpeg su-exec
 
 # Create directories and set permissions
-COPY . /lidatube
-WORKDIR /lidatube
+COPY . /syncify
+WORKDIR /syncify
 
 # Install requirements
-ENV PYTHONPATH /lidatube/src
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Make the script executable
