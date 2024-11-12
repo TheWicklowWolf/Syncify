@@ -1,7 +1,7 @@
 #!/bin/sh
 
 echo -e "\033[1;32mTheWicklowWolf\033[0m"
-echo -e "\033[1;34mLidaTube\033[0m"
+echo -e "\033[1;34mSyncify\033[0m"
 echo "Initializing app..."
 
 cat << 'EOF'
@@ -50,13 +50,12 @@ echo "-----------------"
 
 # Create the required directories with the correct permissions
 echo "Setting up directories.."
-mkdir -p /lidatube/downloads /lidatube/config /lidatube/cache
-chown -R ${PUID}:${PGID} /lidatube
-chmod -R 775 /lidatube
+mkdir -p /syncify/downloads /syncify/config /syncify/cache
+chown -R ${PUID}:${PGID} /syncify
 
 # Set XDG_CACHE_HOME to use the cache directory
-export XDG_CACHE_HOME=/lidatube/cache
+export XDG_CACHE_HOME=/syncify/cache
 
 # Start the application with the specified user permissions
-echo "Running LidaTube..."
-exec su-exec ${PUID}:${PGID} gunicorn src.LidaTube:app -c gunicorn_config.py
+echo "Running Syncify..."
+exec su-exec ${PUID}:${PGID} gunicorn src.Syncify:app -c gunicorn_config.py
