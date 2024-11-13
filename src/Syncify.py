@@ -261,12 +261,12 @@ class DataHandler:
                 playlist_tracks = self.spotify_extractor(playlist_link)
 
             playlist_folder = playlist_name
-            self.playlist_folder_path = os.path.join(self.download_folder, playlist_folder)
+            playlist_folder_full_path = os.path.join(self.download_folder, playlist_folder)
 
-            if not os.path.exists(self.playlist_folder_path):
-                os.makedirs(self.playlist_folder_path)
+            if not os.path.exists(playlist_folder_full_path):
+                os.makedirs(playlist_folder_full_path)
 
-            raw_directory_list = os.listdir(self.playlist_folder_path)
+            raw_directory_list = os.listdir(playlist_folder_full_path)
             directory_list = self.string_cleaner(raw_directory_list)
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.thread_limit) as executor:
@@ -279,7 +279,7 @@ class DataHandler:
                         song_title = song["Title"]
                         if song.get("VideoID"):
                             song_actual_link = self.YOUTUBE_LINK_PREFIX + song["VideoID"]
-                            song_list_to_download.append({"title": cleaned_full_file_name, "link": song_actual_link})
+                            song_list_to_download.append({"title": cleaned_full_file_name, "link": song_actual_link, "playlist_folder": playlist_folder})
                             self.logger.warning(f"Added Song to Download List: {cleaned_full_file_name} : {song_actual_link}")
                         else:
                             future = executor.submit(self.find_youtube_link, song_artist, song_title)
@@ -321,8 +321,9 @@ class DataHandler:
 
         link = song["link"]
         title = song["title"]
+        playlist_folder = song["playlist_folder"]
         sleep = playlist["Sleep"] if playlist["Sleep"] else 0
-        full_file_path = os.path.join(self.playlist_folder_path, title)
+        full_file_path = os.path.join(playlist_folder, title)
 
         ydl_opts = {
             "logger": self.logger,
@@ -392,7 +393,7 @@ class DataHandler:
 
                 logging.warning(f'Finished Downloading List: {playlist["Name"]}')
 
-                playlist["Song_Count"] = len(os.listdir(self.playlist_folder_path))
+                playlist["Song_Count"] = len(os.listdir(os.path.join(self.download_folder, playlist["Name"])))
                 logging.warning(f'Files in Directory: {str(playlist["Song_Count"])}')
 
                 playlist["Last_Synced"] = datetime.datetime.now().strftime("%d-%m-%y %H:%M:%S")
