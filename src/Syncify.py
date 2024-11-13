@@ -291,7 +291,7 @@ class DataHandler:
                 for future, file_name in futures:
                     song_actual_link = future.result()
                     if song_actual_link:
-                        song_list_to_download.append({"title": file_name, "link": song_actual_link})
+                        song_list_to_download.append({"title": file_name, "link": song_actual_link, "playlist_folder": playlist_folder})
                         self.logger.warning(f"Added Song to Download List: {file_name} : {song_actual_link}")
                     else:
                         self.logger.error(f"No Link Found for: {file_name}")
