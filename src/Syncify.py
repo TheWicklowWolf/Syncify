@@ -4,6 +4,7 @@ import sys
 import json
 import time
 import logging
+import tempfile
 import datetime
 import threading
 import concurrent.futures
@@ -315,17 +316,20 @@ class DataHandler:
             self.logger.error(f"Error in Download Queue: {str(e)}")
 
     def download_song(self, song, playlist):
+        temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.media_server_scan_req_flag = True
 
         link = song["link"]
         title = song["title"]
         sleep = playlist["Sleep"] if playlist["Sleep"] else 0
         full_file_path = os.path.join(self.playlist_folder_path, title)
+
         ydl_opts = {
             "logger": self.logger,
             "ffmpeg_location": "/usr/bin/ffmpeg",
             "format": "bestaudio",
-            "outtmpl": full_file_path,
+            "outtmpl": f"{full_file_path}.%(ext)s",
+            "paths": {"home": self.download_folder, "temp": temp_dir.name},
             "quiet": False,
             "progress_hooks": [self.progress_callback],
             "writethumbnail": True,
@@ -362,6 +366,9 @@ class DataHandler:
 
         except Exception as e:
             self.logger.error(f"Error downloading song: {link}. Error message: {e}")
+
+        finally:
+            temp_dir.cleanup()
 
     def progress_callback(self, d):
         if d["status"] == "finished":
