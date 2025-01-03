@@ -16,6 +16,7 @@ import yt_dlp
 from plexapi.server import PlexServer
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
+from spotipy_anon import SpotifyAnon
 import requests
 from thefuzz import fuzz
 
@@ -143,6 +144,8 @@ class DataHandler:
 
     def spotify_extractor(self, link):
         sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(client_id=self.spotify_client_id, client_secret=self.spotify_client_secret))
+        sp_anon = spotipy.Spotify(auth_manager=SpotifyAnon())
+
         track_list = []
 
         if "album" in link:
@@ -160,7 +163,14 @@ class DataHandler:
                     self.logger.error(f"Error Parsing Item in Album: {str(item)} - {str(e)}")
 
         else:
-            playlist = sp.playlist(link)
+            try:
+                playlist = sp.playlist(link)
+
+            except Exception as e:
+                self.logger.error(f"Error using authenticated account to get playlist: {str(e)}.")
+                self.logger.info(f"Attempting to use anonymous authentication...")
+                playlist = sp_anon.playlist(link)
+
             playlist_name = playlist["name"]
             number_of_tracks = playlist["tracks"]["total"]
             fields = "items(track(name,artists(name)),added_at)"
@@ -169,7 +179,14 @@ class DataHandler:
             limit = 100
             all_items = []
             while offset < number_of_tracks:
-                results = sp.playlist_items(link, fields=fields, limit=limit, offset=offset)
+                try:
+                    results = sp.playlist_items(link, fields=fields, limit=limit, offset=offset)
+
+                except Exception as e:
+                    self.logger.error(f"Error using authenticated account to get playlist: {str(e)}.")
+                    self.logger.info(f"Attempting to use anonymous authentication...")
+                    results = sp_anon.playlist_items(link, fields=fields, limit=limit, offset=offset)
+
                 all_items.extend(results["items"])
                 offset += limit
 
