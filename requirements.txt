@@ -5,7 +5,7 @@ flask
 flask_socketio
 spotipy
 spotipy_anon
-yt_dlp[default]==2025.6.9
+yt_dlp[default]==2025.6.25
 plexapi
 ytmusicapi
 requests
