@@ -230,18 +230,20 @@ class DataHandler:
             search_results = self.ytmusic.search(query=f"{artist} - {title}", filter="songs", limit=5)
 
             # Filter for explicit tracks
-            search_results = [track for track in search_results if self.allow_explicit and track.get("isExplicit")]
+            filtered_results = [track for track in search_results if self.allow_explicit and track.get("isExplicit")]
+            if len(filtered_results) == 0:
+                filtered_results = search_results
 
             cleaned_artist = self.string_cleaner(artist).lower()
             cleaned_title = self.string_cleaner(title).lower()
-            for item in search_results:
+            for item in filtered_results:
                 cleaned_youtube_title = self.string_cleaner(item["title"]).lower()
                 if cleaned_title in cleaned_youtube_title:
                     first_result = self.YOUTUBE_LINK_PREFIX + item["videoId"]
                     break
             else:
                 # Try again but check for a partial match
-                for item in search_results:
+                for item in filtered_results:
                     cleaned_youtube_title = self.string_cleaner(item["title"]).lower()
                     cleaned_youtube_artists = ", ".join(self.string_cleaner(x["name"]).lower() for x in item["artists"])
 
@@ -253,7 +255,7 @@ class DataHandler:
                         break
                 else:
                     # Default to first result if Top result is not found
-                    first_result = self.YOUTUBE_LINK_PREFIX + search_results[0]["videoId"]
+                    first_result = self.YOUTUBE_LINK_PREFIX + filtered_results[0]["videoId"]
 
                     # Search for Top result specifically
                     top_search_results = self.ytmusic.search(query=cleaned_title, limit=5)
