@@ -44,6 +44,7 @@ class DataHandler:
         self.thread_limit = int(os.environ.get("thread_limit", 1))
         self.media_server_scan_req_flag = False
         self.crop_album_art = os.getenv("crop_album_art", "false").lower()
+        self.allow_explicit = os.getenv("allow_explicit", "true").lower()
 
         if not os.path.exists(self.config_folder):
             os.makedirs(self.config_folder)
@@ -227,6 +228,9 @@ class DataHandler:
 
             self.ytmusic = YTMusic()
             search_results = self.ytmusic.search(query=f"{artist} - {title}", filter="songs", limit=5)
+
+            # Filter for explicit tracks
+            search_results = [track for track in search_results if self.allow_explicit and track.get("isExplicit")]
 
             cleaned_artist = self.string_cleaner(artist).lower()
             cleaned_title = self.string_cleaner(title).lower()
