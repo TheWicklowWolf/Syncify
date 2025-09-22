@@ -24,6 +24,7 @@ services:
     environment:
       - thread_limit=1
       - crop_album_art=false
+      - allow_explicit=true
     restart: unless-stopped
 ```
 
@@ -36,6 +37,7 @@ Certain values can be set via environment variables:
 * __PGID__: The group ID to run the app with. Defaults to `1000`.
 * __thread_limit__: Max number of threads to use. Defaults to `1`.
 * __crop_album_art__: Set this to `true` to force the creation of square album art instead of using the 16:9 aspect ratio from YouTube. Defaults to `false`.
+* __allow_explicit__: Set this to `false` to prevent explicit version of songs from being downloaded. Defaults to `true`.
 
 
 ## Sync Schedule
