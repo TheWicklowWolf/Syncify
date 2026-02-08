@@ -1,0 +1,15 @@
+services:
+  syncify:
+    build: .
+    container_name: syncify
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./config:/syncify/config
+      - ./downloads:/syncify/downloads
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - thread_limit=1
+      # - crop_album_art=true
+    restart: unless-stopped
