@@ -65,6 +65,9 @@ class DataHandler:
         full_cookies_path = os.path.join(self.config_folder, "cookies.txt")
         self.cookies_path = full_cookies_path if os.path.exists(full_cookies_path) else None
         self.sync_in_progress_flag = False
+        self.sync_progress_file = os.path.join(self.config_folder, "sync_progress.json")
+        self.progress_lock = threading.Lock()
+        self.sync_progress = None
 
         task_thread = threading.Thread(target=self.schedule_checker)
         task_thread.daemon = True
@@ -222,6 +225,11 @@ class DataHandler:
         return track_list
 
     def find_youtube_link(self, artist, title):
+        cached = self.get_cached_link(artist, title)
+        if cached:
+            self.logger.warning(f"Cache hit for: {artist} - {title}")
+            return cached
+
         try:
             first_result = None
 
@@ -265,6 +273,8 @@ class DataHandler:
             self.logger.error(f"Error Finding YouTube Link: {str(e)}")
 
         finally:
+            if first_result:
+                self.cache_link(artist, title, first_result)
             return first_result
 
     def get_download_list(self, playlist):
@@ -378,6 +388,7 @@ class DataHandler:
             self.logger.warning(f"yt_dlp - Starting Download of: {link}")
 
             yt_downloader.download([link])
+            self.mark_song_downloaded(title)
             self.logger.warning(f"yt_dlp - Finished Download of: {link}")
 
             time.sleep(sleep)
@@ -401,16 +412,64 @@ class DataHandler:
             self.sync_in_progress_flag = True
             self.media_server_scan_req_flag = False
             self.logger.warning("Sync Task started...")
-            for playlist in self.sync_list:
-                logging.warning(f'Looking for Playlist Songs on YouTube: {playlist["Name"]}')
-                song_list = self.get_download_list(playlist)
 
-                logging.warning(f'Starting Downloading List: {playlist["Name"]}')
+            existing_progress = self.load_sync_progress()
+            self.sync_progress = existing_progress or {
+                "completed_playlists": [],
+                "current_playlist": None,
+                "link_cache": {},
+            }
+
+            if existing_progress is not None:
+                self.logger.warning("Resuming from previous sync progress.")
+            else:
+                self.save_sync_progress()
+
+            for playlist in self.sync_list:
+                playlist_name = playlist["Name"]
+
+                if playlist_name in self.sync_progress["completed_playlists"]:
+                    self.logger.warning(f"Resuming: skipping completed playlist '{playlist_name}'")
+                    continue
+
+                current = self.sync_progress.get("current_playlist")
+                if current and current["name"] == playlist_name and current.get("download_list") is not None:
+                    downloaded_set = set(current.get("downloaded", []))
+                    playlist_folder_full_path = os.path.join(self.download_folder, playlist_name)
+                    if os.path.exists(playlist_folder_full_path):
+                        raw_directory_list = os.listdir(playlist_folder_full_path)
+                        directory_list = set(self.string_cleaner(raw_directory_list))
+                    else:
+                        directory_list = set()
+                    song_list = [
+                        s for s in current["download_list"]
+                        if s["title"] not in downloaded_set and s["title"] not in directory_list
+                    ]
+                    self.logger.warning(f"Resuming downloads for '{playlist_name}': {len(song_list)} remaining")
+                else:
+                    logging.warning(f'Looking for Playlist Songs on YouTube: {playlist_name}')
+                    song_list = self.get_download_list(playlist)
+                    self.sync_progress["current_playlist"] = {
+                        "name": playlist_name,
+                        "download_list": song_list,
+                        "downloaded": [],
+                    }
+                    self.save_sync_progress()
+
+                logging.warning(f'Starting Downloading List: {playlist_name}')
                 self.download_queue(song_list, playlist)
 
-                logging.warning(f'Finished Downloading List: {playlist["Name"]}')
+                logging.warning(f'Finished Downloading List: {playlist_name}')
 
-                playlist["Song_Count"] = len(os.listdir(os.path.join(self.download_folder, playlist["Name"])))
+                self.sync_progress["completed_playlists"].append(playlist_name)
+                self.sync_progress["current_playlist"] = None
+                self.save_sync_progress()
+
+                playlist_folder_path = os.path.join(self.download_folder, playlist_name)
+                if os.path.exists(playlist_folder_path):
+                    playlist["Song_Count"] = len(os.listdir(playlist_folder_path))
+                else:
+                    playlist["Song_Count"] = 0
                 logging.warning(f'Files in Directory: {str(playlist["Song_Count"])}')
 
                 playlist["Last_Synced"] = datetime.datetime.now().strftime("%d-%m-%y %H:%M:%S")
@@ -418,6 +477,8 @@ class DataHandler:
             self.save_sync_list_to_file()
             data = {"sync_list": self.sync_list}
             socketio.emit("Update", data)
+
+            self.clear_sync_progress()
 
             if self.media_server_scan_req_flag == True and self.media_server_tokens:
                 self.sync_media_servers()
@@ -510,6 +571,49 @@ class DataHandler:
             self.logger.warning("Manual Sync Started.")
             task_thread = threading.Thread(target=self.master_queue, daemon=True)
             task_thread.start()
+
+    def load_sync_progress(self):
+        try:
+            if os.path.exists(self.sync_progress_file):
+                with open(self.sync_progress_file, "r") as f:
+                    return json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            self.logger.error(f"Corrupt or unreadable sync progress file, starting fresh: {e}")
+        return None
+
+    def save_sync_progress(self):
+        with self.progress_lock:
+            try:
+                tmp_path = self.sync_progress_file + ".tmp"
+                with open(tmp_path, "w") as f:
+                    json.dump(self.sync_progress, f, indent=2)
+                os.replace(tmp_path, self.sync_progress_file)
+            except OSError as e:
+                self.logger.error(f"Error saving sync progress: {e}")
+
+    def clear_sync_progress(self):
+        try:
+            if os.path.exists(self.sync_progress_file):
+                os.remove(self.sync_progress_file)
+        except OSError as e:
+            self.logger.error(f"Error clearing sync progress: {e}")
+
+    def get_cached_link(self, artist, title):
+        if self.sync_progress and "link_cache" in self.sync_progress:
+            key = f"{artist}|||{title}"
+            return self.sync_progress["link_cache"].get(key)
+        return None
+
+    def cache_link(self, artist, title, link):
+        if self.sync_progress is not None:
+            key = f"{artist}|||{title}"
+            self.sync_progress["link_cache"][key] = link
+            self.save_sync_progress()
+
+    def mark_song_downloaded(self, title):
+        if self.sync_progress is not None and self.sync_progress.get("current_playlist") is not None:
+            self.sync_progress["current_playlist"]["downloaded"].append(title)
+            self.save_sync_progress()
 
 
 app = Flask(__name__)
