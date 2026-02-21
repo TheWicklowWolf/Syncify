@@ -5,7 +5,7 @@ flask==3.1.2
 flask_socketio==5.6.0
 spotipy==2.25.2
 spotipy_anon==1.5.7
-yt_dlp[default]==2026.2.4
+yt_dlp[default]==2026.2.21
 plexapi==4.18.0
 ytmusicapi==1.11.5
 requests==2.32.5
