@@ -5,8 +5,9 @@
 <img src="https://raw.githubusercontent.com/TheWicklowWolf/Syncify/main/src/static/syncify_full_logo.png" alt="logo">
 
 
-Syncify is a tool for synchronising and fetching content from Spotify or YouTube playlists via yt-dlp.
+Syncify is a tool for synchronising and fetching content from ~~Spotify or~~ YouTube playlists via yt-dlp.
 
+See: https://developer.spotify.com/blog/2026-02-06-update-on-developer-access-and-platform-security
 
 ## Run using docker-compose
 
